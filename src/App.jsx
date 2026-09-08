@@ -1355,7 +1355,7 @@ function ListingCard({ listing, shops, onOpen }) {
 /* ---------------------------------------------------------------------
    MAIN APP
 --------------------------------------------------------------------- */
-export default function App() {
+function AppInner() {
   const [loaded, setLoaded] = useState(false);
   const [lang, setLang] = useState("ar");
   const [listings, setListings] = useState([]);
@@ -4132,5 +4132,38 @@ function StatCard({ icon: Icon, label, value, sub, highlight }) {
       <p className="text-xs mt-0.5" style={{ color: highlight ? C.steelLight : C.steel }}>{label}</p>
       {sub && <p className="text-[10px] mt-0.5" style={{ color: C.rust }}>{sub}</p>}
     </div>
+  );
+}
+
+// Temporary diagnostic aid: shows the real error on screen instead of a
+// blank page, since testing is happening on a phone with no browser
+// console access. Safe to remove once the crash we're chasing is found.
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 20, fontFamily: "monospace", fontSize: 13, whiteSpace: "pre-wrap", color: "#b91c1c", background: "#fff" }}>
+          <p style={{ fontWeight: "bold", marginBottom: 10 }}>Something crashed — screenshot this:</p>
+          <p>{String(this.state.error && this.state.error.message)}</p>
+          <p style={{ marginTop: 10, color: "#666", fontSize: 11 }}>{this.state.error && this.state.error.stack}</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
