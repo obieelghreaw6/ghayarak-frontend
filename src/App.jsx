@@ -1,19 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, createContext, useContext } from "react";
 
-// Bulletproof diagnostic: catches genuinely ANY JS error — including ones
-// inside event handlers or async code that a React error boundary can't
-// see — and surfaces it as a native alert(), which works no matter what
-// else on the page is broken. Temporary, for tracking down the blank-page
-// issue; safe to remove once found.
-if (typeof window !== "undefined") {
-  window.onerror = function (message, source, lineno, colno, error) {
-    alert("CRASH: " + message + "\n\n" + (error && error.stack ? error.stack.slice(0, 500) : "(no stack)"));
-  };
-  window.addEventListener("unhandledrejection", function (event) {
-    alert("UNHANDLED PROMISE REJECTION: " + (event.reason && event.reason.message ? event.reason.message : String(event.reason)));
-  });
-}
-
 import {
   Search, MapPin, ChevronRight, ChevronLeft, Plus, ShieldCheck, Star, Store,
   User, LayoutDashboard, Phone, Mail, CheckCircle2, Clock,
@@ -21,7 +7,7 @@ import {
   CircleDot, LogOut, Camera, Lightbulb, Wind, Gauge, Armchair,
   RectangleHorizontal, Cog, Settings2, Disc, Sparkles, BadgeCheck, AlertTriangle, Trash2,
   Rocket, Building2, Eye, MessageCircle,
-  Languages, ShoppingCart, Truck, AlertOctagon, PackageCheck,
+  Languages, ShoppingCart, Truck, Bike, AlertOctagon, PackageCheck,
   CircleDollarSign, Flag, ChevronDown, Home, Filter as FilterIcon, Send, Bell, PackageSearch
 } from "lucide-react";
 import {
@@ -151,6 +137,8 @@ const T = {
     postTitleIndividual: "List a part",
     postTitleShop: "List a part (Shop)",
     titleField: "Title",
+    vehicleTypeField: "Vehicle Type",
+    allVehicleTypes: "All Vehicles",
     categoryField: "Category",
     conditionField: "Condition",
     makeField: "Make",
@@ -227,6 +215,7 @@ const T = {
     offersCount: "{n} offers",
     noOffersYet: "No offers yet — sellers are being notified.",
     submitOfferBtn: "Submit an offer",
+    tapToRespond: "Tap to respond",
     offerPrice: "Your price (LYD)",
     offerCondition: "Condition",
     offerNotes: "Notes (optional)",
@@ -524,6 +513,8 @@ const T = {
     postTitleIndividual: "أضف قطعة للبيع",
     postTitleShop: "أضف قطعة للبيع (محل)",
     titleField: "العنوان",
+    vehicleTypeField: "نوع المركبة",
+    allVehicleTypes: "كل المركبات",
     categoryField: "القسم",
     conditionField: "الحالة",
     makeField: "الماركة",
@@ -600,6 +591,7 @@ const T = {
     offersCount: "{n} عروض",
     noOffersYet: "لا توجد عروض بعد — يتم إشعار البائعين.",
     submitOfferBtn: "تقديم عرض",
+    tapToRespond: "اضغط للرد",
     offerPrice: "سعرك (د.ل)",
     offerCondition: "الحالة",
     offerNotes: "ملاحظات (اختياري)",
@@ -856,7 +848,35 @@ const CATEGORIES = [
   { id: "glass", icon: RectangleHorizontal, en: "Glass & Mirrors", ar: "الزجاج والمرايا" },
   { id: "accessories", icon: Sparkles, en: "Accessories & Tools", ar: "إكسسوارات وأدوات" },
 ];
-const MAKES = ["Toyota", "Hyundai", "Kia", "Chevrolet", "Range Rover", "Land Rover", "Mercedes-Benz", "Nissan", "Suzuki", "Peugeot", "Renault", "Volkswagen", "Ford", "Mitsubishi", "Isuzu", "Jeep", "Other"];
+const VEHICLE_TYPES = [
+  { id: "car", icon: Car, en: "Car", ar: "سيارة" },
+  { id: "truck", icon: Truck, en: "Truck", ar: "شاحنة" },
+  { id: "motorbike", icon: Bike, en: "Motorbike", ar: "دراجة نارية" },
+];
+// Segmented by vehicle type, since a motorbike listing showing "Range
+// Rover" as a brand option isn't useful — some brands genuinely make more
+// than one type (Ford, Isuzu, Mercedes-Benz trucks; Honda, Suzuki bikes),
+// so they appear in each list where they actually apply, not just once.
+const MAKES_BY_TYPE = {
+  car: [
+    "Toyota", "Hyundai", "Kia", "Chevrolet", "Range Rover", "Land Rover", "Mercedes-Benz",
+    "Nissan", "Suzuki", "Peugeot", "Renault", "Volkswagen", "Ford", "Mitsubishi", "Isuzu",
+    "Jeep", "BMW", "Audi", "Honda", "Mazda", "Skoda", "Fiat", "Dacia", "Opel", "Lexus",
+    "Infiniti", "Chery", "Geely", "Great Wall / Haval", "Other",
+  ],
+  truck: [
+    "Isuzu", "Ford", "Mercedes-Benz", "MAN", "Volvo", "Scania", "Iveco", "Hino",
+    "Mitsubishi", "Chevrolet", "Other",
+  ],
+  motorbike: [
+    "Honda", "Yamaha", "Suzuki", "Bajaj", "TVS", "Haojue", "Sym", "KTM", "Vespa / Piaggio", "Other",
+  ],
+};
+// Flattened, deduplicated union — used only where vehicle type isn't
+// tracked yet (part requests currently don't have a vehicleType field on
+// the backend). Everywhere the vehicle type IS known, use
+// MAKES_BY_TYPE[vehicleType] instead of this.
+const MAKES = [...new Set([...MAKES_BY_TYPE.car, ...MAKES_BY_TYPE.truck, ...MAKES_BY_TYPE.motorbike])];
 const CITIES = [
   { id: "tripoli", en: "Tripoli", ar: "طرابلس" },
   { id: "benghazi", en: "Benghazi", ar: "بنغازي" },
@@ -1123,6 +1143,7 @@ function mapApiListing(l) {
     shopId: l.shop_id,
     title: l.title,
     category: l.category,
+    vehicleType: l.vehicle_type || "car",
     make: l.make,
     model: l.model,
     yearFrom: l.year_from,
@@ -1402,6 +1423,7 @@ function AppInner() {
   const [category, setCategory] = useState(null);
   const [query, setQuery] = useState("");
   const [cityFilter, setCityFilter] = useState("all");
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useState("all");
   const [showLogin, setShowLogin] = useState(false);
   const [showCreateAd, setShowCreateAd] = useState(false);
   const [showPost, setShowPost] = useState(false);
@@ -1693,6 +1715,7 @@ function AppInner() {
     return listings
       .filter((l) => l.status === "active")
       .filter((l) => (category ? l.category === category : true))
+      .filter((l) => (vehicleTypeFilter === "all" ? true : l.vehicleType === vehicleTypeFilter))
       .filter((l) => (cityFilter === "all" ? true : l.city === cityFilter))
       .filter((l) => (availableNowOnly ? l.availableNow : true))
       .filter((l) => {
@@ -1714,7 +1737,7 @@ function AppInner() {
         if (af !== bf) return bf - af;
         return b.createdAt - a.createdAt;
       });
-  }, [listings, category, cityFilter, query, availableNowOnly]);
+  }, [listings, category, vehicleTypeFilter, cityFilter, query, availableNowOnly]);
 
   const featuredListings = useMemo(() => listings.filter((l) => l.status === "active" && l.featured && l.featuredUntil > Date.now()).slice(0, 8), [listings]);
 
@@ -1759,6 +1782,7 @@ function AppInner() {
           yearFrom: form.yearFrom, yearTo: form.yearTo, price: Number(form.price),
           condition: form.condition, city: form.city, description: form.description,
           protectedDeal: form.protectedDeal, shopId: myShop ? myShop.id : undefined,
+          vehicleType: form.vehicleType,
         },
         session.token
       );
@@ -2095,6 +2119,7 @@ function AppInner() {
             <HomeScreen listings={filteredListings} featured={featuredListings} shops={shops} ads={ads}
               query={query} setQuery={setQuery} category={category} setCategory={setCategory}
               cityFilter={cityFilter} setCityFilter={setCityFilter}
+              vehicleTypeFilter={vehicleTypeFilter} setVehicleTypeFilter={setVehicleTypeFilter}
               availableNowOnly={availableNowOnly} setAvailableNowOnly={setAvailableNowOnly}
               onOpen={(l) => { setActiveListing(l); setScreen("listing"); }}
               onNewRequest={() => requireLogin(() => setShowNewRequest(true))}
@@ -2305,15 +2330,12 @@ function CategoryTile({ c, onClick }) {
   );
 }
 
-function HomeScreen({ listings, featured, shops, ads, query, setQuery, category, setCategory, cityFilter, setCityFilter, availableNowOnly, setAvailableNowOnly, onOpen, onNewRequest, onSearchByPhoto, session, recentSearches, onCommitSearch, onAddCar, onSearchMyCar, onSellWithUs }) {
+function HomeScreen({ listings, featured, shops, ads, query, setQuery, category, setCategory, cityFilter, setCityFilter, vehicleTypeFilter, setVehicleTypeFilter, availableNowOnly, setAvailableNowOnly, onOpen, onNewRequest, onSearchByPhoto, session, recentSearches, onCommitSearch, onAddCar, onSearchMyCar, onSellWithUs }) {
   const { t, lang, dir } = useLang();
   const [showAllCats, setShowAllCats] = useState(false);
   const visibleCats = showAllCats ? CATEGORIES : CATEGORIES.slice(0, 7);
   return (
     <div>
-      <div style={{ background: "#ff00ff", color: "#fff", textAlign: "center", padding: 10, fontWeight: "bold", fontSize: 16 }}>
-        BUILD CHECK 4 — if you see this, the new code is live
-      </div>
       <div className="px-4 pt-4 pb-1">
         <h1 className="font-bold" style={{ fontFamily: display(lang), fontSize: 24, color: C.asphalt }}>{t("searchHeroTitle")}</h1>
         <p className="text-xs mt-0.5 mb-3" style={{ color: C.steel }}>{t("searchHeroSubtitle")}</p>
@@ -2348,13 +2370,23 @@ function HomeScreen({ listings, featured, shops, ads, query, setQuery, category,
           </div>
         )}
         <div className="flex items-center justify-between mt-2.5">
-          <div className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border" style={{ borderColor: C.line, background: C.paper }}>
-            <MapPin size={13} color={C.amberDark} />
-            <select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="text-xs font-bold rounded appearance-none pr-1" style={{ color: C.asphalt, background: "transparent" }}>
-              <option value="all">{t("allCities")}</option>
-              {CITIES.map((c) => <option key={c.id} value={c.id}>{label(c, lang)}</option>)}
-            </select>
-            <ChevronDown size={11} color={C.steel} />
+          <div className="flex items-center gap-2">
+            <div className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border" style={{ borderColor: C.line, background: C.paper }}>
+              <MapPin size={13} color={C.amberDark} />
+              <select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="text-xs font-bold rounded appearance-none pr-1" style={{ color: C.asphalt, background: "transparent" }}>
+                <option value="all">{t("allCities")}</option>
+                {CITIES.map((c) => <option key={c.id} value={c.id}>{label(c, lang)}</option>)}
+              </select>
+              <ChevronDown size={11} color={C.steel} />
+            </div>
+            <div className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border" style={{ borderColor: C.line, background: C.paper }}>
+              <Car size={13} color={C.amberDark} />
+              <select value={vehicleTypeFilter} onChange={(e) => setVehicleTypeFilter(e.target.value)} className="text-xs font-bold rounded appearance-none pr-1" style={{ color: C.asphalt, background: "transparent" }}>
+                <option value="all">{t("allVehicleTypes")}</option>
+                {VEHICLE_TYPES.map((v) => <option key={v.id} value={v.id}>{label(v, lang)}</option>)}
+              </select>
+              <ChevronDown size={11} color={C.steel} />
+            </div>
           </div>
           <button onClick={onSearchByPhoto} className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-full" style={{ background: C.amberLight, color: C.amberDark }}>
             <Camera size={13} />{t("searchByPhoto")}
@@ -2772,11 +2804,13 @@ function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isO
    Requests — "I Need This Part"
 --------------------------------------------------------------------- */
 function RequestCard({ request, onOpen }) {
-  const { t, lang } = useLang();
+  const { t, lang, dir } = useLang();
   const city = findCity(request.city);
   const urgency = findUrgency(request.urgency);
+  const hasOffers = request.offers.length > 0;
+  const NextIcon = dir === "rtl" ? ChevronLeft : ChevronRight;
   return (
-    <button onClick={() => onOpen(request)} className="w-full text-left p-3.5 rounded-xl border" style={{ borderColor: C.line, background: "#fff" }}>
+    <button onClick={() => onOpen(request)} className="w-full text-left p-3.5 rounded-xl border" style={{ borderColor: hasOffers ? C.amber : C.line, background: "#fff", borderWidth: hasOffers ? 1.5 : 1 }}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-bold" style={{ color: C.asphalt }}>{request.make} {request.model} {request.year ? `· ${request.year}` : ""}</p>
@@ -2786,9 +2820,15 @@ function RequestCard({ request, onOpen }) {
       </div>
       <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t" style={{ borderColor: C.line }}>
         <span className="text-xs flex items-center gap-1" style={{ color: C.steel }}><MapPin size={11} />{label(city, lang)}</span>
-        <span className="text-xs font-semibold flex items-center gap-1" style={{ color: request.offers.length ? C.amberDark : C.steel }}>
-          <MessageCircle size={11} />{t("offersCount", { n: request.offers.length })}
-        </span>
+        {hasOffers ? (
+          <span className="text-xs font-bold flex items-center gap-1 px-2.5 py-1 rounded-full" style={{ background: C.amber, color: "#fff" }}>
+            <MessageCircle size={12} />{t("offersCount", { n: request.offers.length })}<NextIcon size={12} />
+          </span>
+        ) : (
+          <span className="text-xs font-semibold flex items-center gap-1" style={{ color: C.amberDark }}>
+            {t("tapToRespond")}<NextIcon size={12} />
+          </span>
+        )}
       </div>
     </button>
   );
@@ -2853,9 +2893,12 @@ function RequestDetail({ request, session, myShop, onBack, onOffer, onAccept, on
         </div>
       </div>
 
+      {canOffer && request.status === "open" && (
+        <PrimaryButton full icon={ShoppingCart} onClick={onOffer}>{t("submitOfferBtn")}</PrimaryButton>
+      )}
+
       <div className="mt-5 flex items-center justify-between">
         <p className="text-xs font-semibold" style={{ color: C.steel, letterSpacing: 0.4 }}>{t("offersCount", { n: request.offers.length })}</p>
-        {canOffer && request.status === "open" && <button onClick={onOffer} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.amberLight, color: C.amberDark }}>{t("submitOfferBtn")}</button>}
       </div>
 
       {request.offers.length === 0 ? (
@@ -3687,14 +3730,14 @@ function LoginModal({ onClose, onLogin }) {
 --------------------------------------------------------------------- */
 function AddCarModal({ onClose, onSave }) {
   const { t } = useLang();
-  const [make, setMake] = useState(MAKES[0]);
+  const [make, setMake] = useState(MAKES_BY_TYPE.car[0]);
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
   const valid = model.trim() && year;
   return (
     <Modal title={t("addCarModalTitle")} onClose={onClose}>
       <div className="grid grid-cols-2 gap-2">
-        <Field label={t("makeField")}><select style={inputStyle} value={make} onChange={(e) => setMake(e.target.value)}>{MAKES.map((m) => <option key={m}>{m}</option>)}</select></Field>
+        <Field label={t("makeField")}><select style={inputStyle} value={make} onChange={(e) => setMake(e.target.value)}>{MAKES_BY_TYPE.car.map((m) => <option key={m}>{m}</option>)}</select></Field>
         <Field label={t("modelField")}><input style={inputStyle} value={model} onChange={(e) => setModel(e.target.value)} placeholder="e.g. Sport" /></Field>
       </div>
       <Field label={t("yearFrom")}><input type="number" style={inputStyle} value={year} onChange={(e) => setYear(e.target.value)} placeholder="2018" /></Field>
@@ -3727,19 +3770,36 @@ function PostChoiceModal({ onClose, onSell, onRequest }) {
 
 function PostListingModal({ onClose, onSubmit, isShop }) {
   const { t, lang } = useLang();
-  const [form, setForm] = useState({ title: "", category: CATEGORIES[0].id, make: MAKES[0], model: "", yearFrom: 2015, yearTo: 2020, engineTrim: "", price: "", stock: 1, condition: CONDITIONS[0].id, authenticity: "aftermarket", partNumber: "", city: CITIES[0].id, description: "", protectedDeal: true, deliveryAvailable: false });
+  const [form, setForm] = useState({ vehicleType: "car", title: "", category: CATEGORIES[0].id, make: MAKES_BY_TYPE.car[0], model: "", yearFrom: 2015, yearTo: 2020, engineTrim: "", price: "", stock: 1, condition: CONDITIONS[0].id, authenticity: "aftermarket", partNumber: "", city: CITIES[0].id, description: "", protectedDeal: true, deliveryAvailable: false });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  // Switching vehicle type resets make to that type's first option —
+  // otherwise a leftover selection like "Range Rover" could stay set
+  // after switching to Motorbike, where it doesn't belong.
+  const setVehicleType = (vt) => setForm((f) => ({ ...f, vehicleType: vt, make: MAKES_BY_TYPE[vt][0] }));
   const valid = form.title.trim() && form.model.trim() && form.price;
 
   return (
     <Modal title={isShop ? t("postTitleShop") : t("postTitleIndividual")} onClose={onClose} wide>
+      <Field label={t("vehicleTypeField")}>
+        <div className="grid grid-cols-3 gap-2">
+          {VEHICLE_TYPES.map((vt) => {
+            const Icon = vt.icon;
+            const active = form.vehicleType === vt.id;
+            return (
+              <button key={vt.id} type="button" onClick={() => setVehicleType(vt.id)} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-lg border text-xs font-semibold" style={{ borderColor: active ? C.amber : C.line, background: active ? C.amberLight : "#fff", color: active ? C.amberDark : C.asphalt }}>
+                <Icon size={16} />{label(vt, lang)}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
       <Field label={t("titleField")}><input style={inputStyle} value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Range Rover Sport LED Headlight" /></Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label={t("categoryField")}><select style={inputStyle} value={form.category} onChange={(e) => set("category", e.target.value)}>{CATEGORIES.map((c) => <option key={c.id} value={c.id}>{label(c, lang)}</option>)}</select></Field>
         <Field label={t("conditionField")}><select style={inputStyle} value={form.condition} onChange={(e) => set("condition", e.target.value)}>{CONDITIONS.map((c) => <option key={c.id} value={c.id}>{label(c, lang)}</option>)}</select></Field>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Field label={t("makeField")}><select style={inputStyle} value={form.make} onChange={(e) => set("make", e.target.value)}>{MAKES.map((m) => <option key={m}>{m}</option>)}</select></Field>
+        <Field label={t("makeField")}><select style={inputStyle} value={form.make} onChange={(e) => set("make", e.target.value)}>{MAKES_BY_TYPE[form.vehicleType].map((m) => <option key={m}>{m}</option>)}</select></Field>
         <Field label={t("modelField")}><input style={inputStyle} value={form.model} onChange={(e) => set("model", e.target.value)} placeholder="e.g. Sport" /></Field>
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -3785,6 +3845,10 @@ function EditListingModal({ listing, onClose, onSubmit }) {
   });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const valid = form.title.trim() && form.model.trim() && form.price;
+  // A listing already has a real vehicleType (from mapApiListing) even
+  // though editing it isn't otherwise wired up — no reason to fall back
+  // to the flat combined list when the correct one is already known.
+  const editMakeOptions = MAKES_BY_TYPE[listing.vehicleType] || MAKES;
 
   return (
     <Modal title={t("editListingModalTitle")} onClose={onClose} wide>
@@ -3794,7 +3858,7 @@ function EditListingModal({ listing, onClose, onSubmit }) {
         <Field label={t("conditionField")}><select style={inputStyle} value={form.condition} onChange={(e) => set("condition", e.target.value)}>{CONDITIONS.map((c) => <option key={c.id} value={c.id}>{label(c, lang)}</option>)}</select></Field>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Field label={t("makeField")}><select style={inputStyle} value={form.make} onChange={(e) => set("make", e.target.value)}>{MAKES.map((m) => <option key={m}>{m}</option>)}</select></Field>
+        <Field label={t("makeField")}><select style={inputStyle} value={form.make} onChange={(e) => set("make", e.target.value)}>{editMakeOptions.map((m) => <option key={m}>{m}</option>)}</select></Field>
         <Field label={t("modelField")}><input style={inputStyle} value={form.model} onChange={(e) => set("model", e.target.value)} /></Field>
       </div>
       <div className="grid grid-cols-2 gap-2">
