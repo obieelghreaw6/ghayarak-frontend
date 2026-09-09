@@ -228,6 +228,10 @@ const T = {
     requestFrom: "Requested by",
     yourOffer: "Your offer",
     contactToArrange: "Contact",
+    messageSellerBtn: "Message Seller",
+    messageWithTitle: "Chat with {name}",
+    conversationsTitle: "Messages",
+    loading: "Loading…",
     noRequestsYet: "No open requests right now.",
     myRequestsEmpty: "You haven't posted a part request yet.",
     backToRequests: "Back to requests",
@@ -604,6 +608,10 @@ const T = {
     requestFrom: "طلب من",
     yourOffer: "عرضك",
     contactToArrange: "تواصل",
+    messageSellerBtn: "راسل البائع",
+    messageWithTitle: "محادثة مع {name}",
+    conversationsTitle: "الرسائل",
+    loading: "جارٍ التحميل…",
     noRequestsYet: "لا توجد طلبات مفتوحة حاليًا.",
     myRequestsEmpty: "لم تنشر أي طلب قطعة بعد.",
     backToRequests: "رجوع للطلبات",
@@ -1004,6 +1012,14 @@ const financeApi = {
   getMine: (token) => apiRequest("/me/financials", { headers: { Authorization: `Bearer ${token}` } }),
 };
 
+const messagesApi = {
+  getOrderMessages: (orderId, token) => apiRequest(`/orders/${orderId}/messages`, { headers: { Authorization: `Bearer ${token}` } }),
+  sendOrderMessage: (orderId, body, token) => apiRequest(`/orders/${orderId}/messages`, { method: "POST", body: JSON.stringify({ body }), headers: { Authorization: `Bearer ${token}` } }),
+  getListingMessages: (listingId, withUserId, token) => apiRequest(`/listings/${listingId}/messages${withUserId ? "?withUserId=" + withUserId : ""}`, { headers: { Authorization: `Bearer ${token}` } }),
+  getListingConversations: (listingId, token) => apiRequest(`/listings/${listingId}/conversations`, { headers: { Authorization: `Bearer ${token}` } }),
+  sendListingMessage: (listingId, body, recipientId, token) => apiRequest(`/listings/${listingId}/messages`, { method: "POST", body: JSON.stringify({ body, recipientId }), headers: { Authorization: `Bearer ${token}` } }),
+};
+
 const requestsApi = {
   list: (params) => apiRequest(`/requests${params ? "?" + new URLSearchParams(params) : ""}`),
   get: (id) => apiRequest(`/requests/${id}`),
@@ -1011,6 +1027,19 @@ const requestsApi = {
   makeOffer: (id, body, token) => apiRequest(`/requests/${id}/offers`, { method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
   acceptOffer: (id, offerId, token) => apiRequest(`/requests/${id}/accept-offer`, { method: "POST", body: JSON.stringify({ offerId }), headers: { Authorization: `Bearer ${token}` } }),
 };
+
+function mapApiMessage(m) {
+  return {
+    id: m.id,
+    orderId: m.order_id,
+    listingId: m.listing_id,
+    senderId: m.sender_id,
+    recipientId: m.recipient_id,
+    body: m.body,
+    readAt: m.read_at,
+    createdAt: m.created_at ? new Date(m.created_at).getTime() : Date.now(),
+  };
+}
 
 function mapApiOffer(o) {
   return {
@@ -1418,6 +1447,8 @@ function AppInner() {
   const [activeRequest, setActiveRequest] = useState(null);
   const [activeOrder, setActiveOrder] = useState(null);
   const [activeShopId, setActiveShopId] = useState(null);
+  const [showListingMessage, setShowListingMessage] = useState(null);
+  const [showListingConversations, setShowListingConversations] = useState(null);
   const [activeShop, setActiveShop] = useState(null);
   const [editingListing, setEditingListing] = useState(null);
   const [category, setCategory] = useState(null);
@@ -1629,6 +1660,20 @@ function AppInner() {
       }
     })();
   }, [screen]);
+
+  // Real order-scoped message thread — fetched fresh whenever a specific
+  // order is opened, replacing what used to be entirely local fake data.
+  useEffect(() => {
+    if (screen !== "orderDetail" || !activeOrder?.id || !session?.token) return;
+    (async () => {
+      try {
+        const { messages: apiMessages } = await messagesApi.getOrderMessages(activeOrder.id, session.token);
+        setMessages(apiMessages.map(mapApiMessage));
+      } catch (e) {
+        console.error("Could not load messages.", e);
+      }
+    })();
+  }, [screen, activeOrder?.id, session?.token]);
 
   // The active shop's public profile — fetched fresh whenever a specific
   // shop is opened, since it's no longer sitting in a locally-populated
@@ -2011,11 +2056,13 @@ function AppInner() {
     }
   }
   async function handleSendMessage(orderId, body) {
-    const order = orders.find((o) => o.id === orderId);
-    const recipient = session.contact === order.buyerContact ? order.sellerContact : order.buyerContact;
-    const newMessage = { id: `MSG-${Date.now()}`, orderId, senderContact: session.contact, senderName: session.name, recipientContact: recipient, body, createdAt: Date.now() };
-    await persistMessages([...messages, newMessage]);
-    pushNotification(recipient, "new_message", body.slice(0, 60), orderId);
+    try {
+      await messagesApi.sendOrderMessage(orderId, body, session.token);
+      const { messages: apiMessages } = await messagesApi.getOrderMessages(orderId, session.token);
+      setMessages(apiMessages.map(mapApiMessage));
+    } catch (e) {
+      flash(e.message);
+    }
   }
   async function handleMarkAllNotificationsRead() {
     const next = notifications.map((n) => (n.userContact === session.contact && !n.readAt ? { ...n, readAt: Date.now() } : n));
@@ -2160,10 +2207,12 @@ function AppInner() {
               onBack={() => setScreen("home")}
               onBuy={() => requireLogin(() => setShowBuy(activeListing))}
               onMarkSold={() => handleMarkSold(activeListing.id)}
-              isOwner={session && activeListing.phone === session.contact}
+              isOwner={session && activeListing.sellerId === session.id}
               onOpenShop={(id) => { setActiveShopId(id); setScreen("shop"); }}
               isFavorite={favoriteIds.includes(activeListing.id)}
-              onToggleFavorite={() => requireLogin(() => toggleFavorite(activeListing.id))} />
+              onToggleFavorite={() => requireLogin(() => toggleFavorite(activeListing.id))}
+              onMessageSeller={() => requireLogin(() => setShowListingMessage({ listingId: activeListing.id }))}
+              onViewConversations={() => setShowListingConversations(activeListing.id)} />
           )}
           {screen === "requests" && (
             <RequestsScreen requests={requests} session={session}
@@ -2193,7 +2242,7 @@ function AppInner() {
               onSubmitBankConfirmation={(ref) => handleSubmitBankConfirmation(activeOrder.id, ref)} />
           )}
           {screen === "account" && (
-            <AccountScreen session={session} myShop={myShop} listings={listings.filter((l) => l.phone === session?.contact)}
+            <AccountScreen session={session} myShop={myShop} listings={myListingsAll}
               myRequests={requests.filter((r) => r.requesterContact === session?.contact)}
               myOrders={orders.filter((o) => o.buyerContact === session?.contact)}
               mySales={orders.filter((o) => o.sellerContact === session?.contact)}
@@ -2241,6 +2290,13 @@ function AppInner() {
         {showNewRequest && session && <NewRequestModal onClose={() => setShowNewRequest(false)} onSubmit={handleCreateRequest} />}
         {showOffer && session && <OfferModal onClose={() => setShowOffer(null)} onSubmit={(form) => handleSubmitOffer(showOffer, form)} />}
         {showBuy && session && <BuyModal listing={showBuy} onClose={() => setShowBuy(null)} onSubmit={(form) => handleCreateOrder(showBuy, form)} />}
+        {showListingMessage && session && (
+          <ListingMessageModal listingId={showListingMessage.listingId} otherPartyId={showListingMessage.otherPartyId} otherPartyName={showListingMessage.otherPartyName} session={session} onClose={() => setShowListingMessage(null)} />
+        )}
+        {showListingConversations && session && (
+          <ListingConversationsModal listingId={showListingConversations} session={session} onClose={() => setShowListingConversations(null)}
+            onOpenThread={(otherPartyId, otherPartyName) => { setShowListingConversations(null); setShowListingMessage({ listingId: showListingConversations, otherPartyId, otherPartyName }); }} />
+        )}
         {showDispute && session && <DisputeModal onClose={() => setShowDispute(null)} onSubmit={(form) => handleSubmitDispute(showDispute, form)} />}
         {showRefundRequest && session && <RefundRequestModal order={orders.find((o) => o.id === showRefundRequest)} onClose={() => setShowRefundRequest(null)} onSubmit={(form) => handleRequestRefund(showRefundRequest, form)} />}
         {showNotifications && session && (
@@ -2707,7 +2763,7 @@ function ShopProfileScreen({ shop, listings, orders, onBack, onOpen }) {
   );
 }
 
-function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isOwner, onOpenShop, isFavorite, onToggleFavorite }) {
+function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isOwner, onOpenShop, isFavorite, onToggleFavorite, onMessageSeller, onViewConversations }) {
   const { t, lang, dir } = useLang();
   const Icon = CAT_ICON[listing.category] || Package;
   const shop = listing.shopId ? shops.find((s) => s.id === listing.shopId) : null;
@@ -2784,13 +2840,19 @@ function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isO
             <p className="text-xs mt-1" style={{ color: C.asphalt }}>{t("protectedDealText", { fee: protectionAmount })}</p>
           </div>
         )}
-        <div className="mt-5 flex gap-2 sticky bottom-20">
+        <div className="mt-5 flex flex-col gap-2 sticky bottom-20">
           {isOwner ? (
-            listing.status === "active" && <PrimaryButton full onClick={onMarkSold}>{t("markAsSold")}</PrimaryButton>
+            <>
+              {listing.status === "active" && <PrimaryButton full onClick={onMarkSold}>{t("markAsSold")}</PrimaryButton>}
+              <GhostButton full icon={MessageCircle} onClick={onViewConversations}>{t("conversationsTitle")}</GhostButton>
+            </>
           ) : listing.status === "active" ? (
-            <PrimaryButton full icon={ShoppingCart} onClick={onBuy}>
-              {t("buyNow")} · {listing.price.toLocaleString()} {lang === "ar" ? "د.ل" : listing.currency}
-            </PrimaryButton>
+            <>
+              <PrimaryButton full icon={ShoppingCart} onClick={onBuy}>
+                {t("buyNow")} · {listing.price.toLocaleString()} {lang === "ar" ? "د.ل" : listing.currency}
+              </PrimaryButton>
+              {session && <GhostButton full icon={MessageCircle} onClick={onMessageSeller}>{t("messageSellerBtn")}</GhostButton>}
+            </>
           ) : listing.status === "reserved" ? (
             <div className="w-full text-center p-3 rounded-lg text-sm font-semibold" style={{ background: C.sand, color: C.steel }}>{t("listingReservedNote")}</div>
           ) : null}
@@ -2965,6 +3027,115 @@ function NewRequestModal({ onClose, onSubmit }) {
         </div>
       </Field>
       <PrimaryButton full disabled={!valid} onClick={() => onSubmit({ ...form, year: form.year ? Number(form.year) : null })}>{t("submitRequestBtn")}</PrimaryButton>
+    </Modal>
+  );
+}
+
+// A real message thread, scoped to one listing and one specific other
+// party. Used both by a buyer asking the seller a question (otherPartyId
+// is implicitly the seller — the backend infers this) and by a seller
+// replying to a specific buyer's thread (otherPartyId is explicit, picked
+// from ListingConversationsModal below).
+function ListingMessageModal({ listingId, otherPartyId, otherPartyName, session, onClose }) {
+  const { t } = useLang();
+  const [thread, setThread] = useState([]);
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    try {
+      const { messages } = await messagesApi.getListingMessages(listingId, otherPartyId, session.token);
+      setThread(messages.map(mapApiMessage));
+    } catch (e) {
+      console.error("Could not load messages.", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [listingId, otherPartyId, session.token]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  async function send() {
+    if (!text.trim()) return;
+    const body = text.trim();
+    setText("");
+    try {
+      await messagesApi.sendListingMessage(listingId, body, otherPartyId, session.token);
+      await refresh();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  return (
+    <Modal title={otherPartyName ? t("messageWithTitle", { name: otherPartyName }) : t("messageSellerBtn")} onClose={onClose}>
+      <div className="rounded-xl border overflow-hidden" style={{ borderColor: C.line }}>
+        <div className="p-3 space-y-2 max-h-72 overflow-y-auto" style={{ background: C.sandLight }}>
+          {loading ? (
+            <p className="text-xs text-center py-3" style={{ color: C.steel }}>{t("loading")}</p>
+          ) : thread.length === 0 ? (
+            <p className="text-xs text-center py-3" style={{ color: C.steel }}>{t("noMessagesYet")}</p>
+          ) : (
+            thread.map((m) => {
+              const mine = m.senderId === session.id;
+              return (
+                <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                  <div dir="auto" className="max-w-[75%] px-3 py-2 rounded-2xl text-sm" style={{ background: mine ? C.amber : "#fff", color: mine ? "#fff" : C.asphalt, unicodeBidi: "plaintext", border: mine ? "none" : `1px solid ${C.line}` }}>
+                    {m.body}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+        <div className="flex items-center gap-2 p-2 border-t" style={{ borderColor: C.line, background: "#fff" }}>
+          <input dir="auto" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder={t("messagePlaceholder")} className="flex-1 text-sm outline-none px-2" style={{ color: C.asphalt }} />
+          <button onClick={send} className="p-2 rounded-full flex-shrink-0" style={{ background: C.amber }}><Send size={14} color="#fff" /></button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// Seller-only: which buyers have messaged about this listing, so they
+// have something to pick from before opening one specific thread above.
+function ListingConversationsModal({ listingId, session, onClose, onOpenThread }) {
+  const { t } = useLang();
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { conversations: rows } = await messagesApi.getListingConversations(listingId, session.token);
+        setConversations(rows);
+      } catch (e) {
+        console.error("Could not load conversations.", e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [listingId, session.token]);
+
+  return (
+    <Modal title={t("conversationsTitle")} onClose={onClose}>
+      {loading ? (
+        <p className="text-sm text-center py-6" style={{ color: C.steel }}>{t("loading")}</p>
+      ) : conversations.length === 0 ? (
+        <p className="text-sm text-center py-6" style={{ color: C.steel }}>{t("noMessagesYet")}</p>
+      ) : (
+        <div className="space-y-2">
+          {conversations.map((c) => (
+            <button key={c.other_user_id} onClick={() => onOpenThread(c.other_user_id, c.other_user_name)} className="w-full text-left p-3 rounded-xl border flex items-center justify-between" style={{ borderColor: C.line, background: "#fff" }}>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold" style={{ color: C.asphalt }}>{c.other_user_name}</p>
+                <p dir="auto" className="text-xs mt-0.5 line-clamp-1" style={{ color: C.steel, unicodeBidi: "plaintext" }}>{c.last_body}</p>
+              </div>
+              <ChevronRight size={16} color={C.steel} />
+            </button>
+          ))}
+        </div>
+      )}
     </Modal>
   );
 }
@@ -3217,7 +3388,7 @@ function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, on
                 <p className="text-xs text-center py-3" style={{ color: C.steel }}>{t("noMessagesYet")}</p>
               ) : (
                 messages.map((m) => {
-                  const mine = m.senderContact === session.contact;
+                  const mine = m.senderId === session.id;
                   return (
                     <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                       <div dir="auto" className="max-w-[75%] px-3 py-2 rounded-2xl text-sm" style={{ background: mine ? C.amber : "#fff", color: mine ? "#fff" : C.asphalt, unicodeBidi: "plaintext", border: mine ? "none" : `1px solid ${C.line}` }}>
