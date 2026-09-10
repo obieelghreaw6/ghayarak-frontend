@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, createContext, useContext } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, createContext, useContext } from "react";
 
 import {
   Search, MapPin, ChevronRight, ChevronLeft, Plus, ShieldCheck, Star, Store,
@@ -137,6 +137,20 @@ const T = {
     postTitleIndividual: "List a part",
     postTitleShop: "List a part (Shop)",
     titleField: "Title",
+    statTotalUsers: "Total Users", statActiveOf: "{n} active", statTotalOf: "{n} total", statOpenRequests: "Open Requests",
+    statGMV: "GMV", sectionMoney: "Money", statCommissionEarned: "Commission Earned", statCommissionOutstanding: "Outstanding",
+    statCommissionCollected: "Collected", statAOV: "Avg Order Value", sectionSupply: "Supply", statVerifiedOf: "{n} verified", statIndividualSellers: "Individual Sellers",
+    statActiveSellers: "Active Sellers", statNewSellers: "New Sellers", statThisWeek: "this week", sectionDemand: "Demand",
+    statRequestsWeek: "Requests (7d)", statRequestsWithOffers: "Requests With Offers", statNoOfferOf: "{n} with no offers",
+    statAvgTimeToOffer: "Avg Time to First Offer", statHours: "{n}h", statNoData: "No data yet", statAvgOffersPerRequest: "Avg Offers / Request",
+    sectionOperations: "Operations", statAwaitingAcceptance: "Awaiting Acceptance", statInDelivery: "In Delivery",
+    statOpenDisputes: "Open Disputes", statFailedPayments: "Failed Payments", marketplaceHealth: "Marketplace Health",
+    healthOrderCompletion: "Orders completing normally", healthPaymentSuccess: "Payment success", healthRequestsGettingOffers: "Requests getting offers",
+    healthSellersNoSales: "Sellers with no sales yet", healthGood: "Good", healthWarning: "Watch", healthBad: "Needs attention", healthUnknown: "Not enough data",
+    periodToday: "Today", period7d: "7 days", period30d: "30 days", period90d: "90 days", statRefunds: "Refunds", statNetRevenue: "Net Revenue",
+    photosField: "Photos", coverPhotoLabel: "Cover", retryUploadBtn: "Retry", addPhotoBtn: "Add photo",
+    sensitiveEditWarning: "Changing the make, model, year, category, condition, or part number sends this listing back for admin review — it will be hidden from search until re-approved.",
+    listingUpdatedNeedsReviewToast: "Updated — sent back for review since key details changed.",
     vehicleTypeField: "Vehicle Type",
     allVehicleTypes: "All Vehicles",
     categoryField: "Category",
@@ -425,7 +439,8 @@ const T = {
     notif_order_completed: "Order completed",
     notif_order_cancelled: "Order cancelled",
     notif_dispute_update: "Dispute update",
-    notif_request_response: "New offer on your request",
+    notif_request_response: "New offer on your request", notif_new_offer: "New offer on your request",
+    notif_request_expired: "Request expired", notif_request_cancelled: "Request cancelled",
     notif_matching_request: "A customer request matches your inventory",
     notif_new_message: "New message",
     // Financials
@@ -521,6 +536,20 @@ const T = {
     postTitleIndividual: "أضف قطعة للبيع",
     postTitleShop: "أضف قطعة للبيع (محل)",
     titleField: "العنوان",
+    statTotalUsers: "إجمالي المستخدمين", statActiveOf: "{n} نشط", statTotalOf: "{n} الإجمالي", statOpenRequests: "الطلبات المفتوحة",
+    statGMV: "إجمالي قيمة المبيعات", sectionMoney: "الأموال", statCommissionEarned: "العمولة المكتسبة", statCommissionOutstanding: "المستحقة",
+    statCommissionCollected: "المحصّلة", statAOV: "متوسط قيمة الطلب", sectionSupply: "العرض", statVerifiedOf: "{n} موثّق", statIndividualSellers: "بائعون أفراد",
+    statActiveSellers: "بائعون نشطون", statNewSellers: "بائعون جدد", statThisWeek: "هذا الأسبوع", sectionDemand: "الطلب",
+    statRequestsWeek: "الطلبات (٧ أيام)", statRequestsWithOffers: "طلبات لها عروض", statNoOfferOf: "{n} بدون عروض",
+    statAvgTimeToOffer: "متوسط الوقت لأول عرض", statHours: "{n} س", statNoData: "لا توجد بيانات بعد", statAvgOffersPerRequest: "متوسط العروض لكل طلب",
+    sectionOperations: "العمليات", statAwaitingAcceptance: "بانتظار القبول", statInDelivery: "قيد التوصيل",
+    statOpenDisputes: "النزاعات المفتوحة", statFailedPayments: "مدفوعات فاشلة", marketplaceHealth: "صحة السوق",
+    healthOrderCompletion: "الطلبات تكتمل بشكل طبيعي", healthPaymentSuccess: "نجاح الدفع", healthRequestsGettingOffers: "الطلبات التي تحصل على عروض",
+    healthSellersNoSales: "بائعون بدون مبيعات بعد", healthGood: "جيد", healthWarning: "راقب", healthBad: "يحتاج اهتمام", healthUnknown: "بيانات غير كافية",
+    periodToday: "اليوم", period7d: "٧ أيام", period30d: "٣٠ يومًا", period90d: "٩٠ يومًا", statRefunds: "المبالغ المستردة", statNetRevenue: "صافي الإيرادات",
+    photosField: "الصور", coverPhotoLabel: "الغلاف", retryUploadBtn: "إعادة المحاولة", addPhotoBtn: "إضافة صورة",
+    sensitiveEditWarning: "تغيير الصانع أو الموديل أو السنة أو الفئة أو الحالة أو رقم القطعة يعيد الإعلان للمراجعة — سيختفي من نتائج البحث حتى تتم الموافقة عليه مجددًا.",
+    listingUpdatedNeedsReviewToast: "تم التحديث — أُعيد للمراجعة بسبب تغيير تفاصيل مهمة.",
     vehicleTypeField: "نوع المركبة",
     allVehicleTypes: "كل المركبات",
     categoryField: "القسم",
@@ -803,7 +832,8 @@ const T = {
     notif_order_completed: "اكتمل الطلب",
     notif_order_cancelled: "تم إلغاء الطلب",
     notif_dispute_update: "تحديث النزاع",
-    notif_request_response: "عرض جديد على طلبك",
+    notif_request_response: "عرض جديد على طلبك", notif_new_offer: "عرض جديد على طلبك",
+    notif_request_expired: "انتهى الطلب", notif_request_cancelled: "تم إلغاء الطلب",
     notif_matching_request: "طلب عميل يطابق مخزونك",
     notif_new_message: "رسالة جديدة",
     financialsTab: "الماليات",
@@ -969,6 +999,41 @@ async function apiRequest(path, options = {}, retriesLeft = 2) {
   return data;
 }
 
+// Uses XMLHttpRequest, not fetch — fetch has no way to report upload
+// progress, and real progress feedback was an explicit requirement for
+// something as slow as photo uploads on a mobile connection.
+function uploadImages(files, purpose, token, onProgress) {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    for (const file of files) formData.append("images", file);
+    formData.append("purpose", purpose);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE}/uploads`);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText); } catch { /* empty body */ }
+      // 207 = partial success (some files in the batch uploaded before
+      // one failed) — still resolved, not rejected, so the caller can
+      // show what did succeed rather than losing it entirely.
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+      else reject(new Error(data.error || `Upload failed (${xhr.status}).`));
+    };
+    xhr.onerror = () => reject(new Error("Couldn't reach the server. Check your connection and try again."));
+    xhr.send(formData);
+  });
+}
+
+const uploadsApi = {
+  upload: (files, purpose, token, onProgress) => uploadImages(files, purpose, token, onProgress),
+  delete: (id, token) => apiRequest(`/uploads/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }),
+};
+
 const authApi = {
   requestOtp: (contact) => apiRequest("/auth/request-otp", { method: "POST", body: JSON.stringify({ contact }) }),
   verifyOtp: (name, contact, code) => apiRequest("/auth/verify-otp", { method: "POST", body: JSON.stringify({ name, contact, code }) }),
@@ -977,10 +1042,12 @@ const authApi = {
 
 const listingsApi = {
   list: (params) => apiRequest(`/listings${params ? "?" + new URLSearchParams(params) : ""}`),
+  get: (id) => apiRequest(`/listings/${id}`),
   create: (body, token) => apiRequest("/listings", { method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
   mine: (token) => apiRequest("/listings/mine", { headers: { Authorization: `Bearer ${token}` } }),
   setStatus: (id, status, token) => apiRequest(`/listings/${id}`, { method: "PATCH", body: JSON.stringify({ status }), headers: { Authorization: `Bearer ${token}` } }),
   boost: (id, token) => apiRequest(`/listings/${id}/boost`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
+  update: (id, fields, token) => apiRequest(`/listings/${id}`, { method: "PUT", body: JSON.stringify(fields), headers: { Authorization: `Bearer ${token}` } }),
 };
 
 const adsApi = {
@@ -1000,6 +1067,9 @@ const adminApi = {
   transitionRefund: (id, action, reason, token) => apiRequest(`/admin/refunds/${id}/${action}`, { method: "POST", body: JSON.stringify(reason ? { reason } : {}), headers: { Authorization: `Bearer ${token}` } }),
   getPendingBankTransfers: (token) => apiRequest("/admin/bank-transfers/pending", { headers: { Authorization: `Bearer ${token}` } }),
   verifyBankTransfer: (id, decision, rejectionReason, token) => apiRequest(`/admin/bank-transfers/${id}/verify`, { method: "POST", body: JSON.stringify({ decision, rejectionReason }), headers: { Authorization: `Bearer ${token}` } }),
+  getOverview: (token) => apiRequest("/admin/overview", { headers: { Authorization: `Bearer ${token}` } }),
+  getRevenueChart: (days, token) => apiRequest(`/admin/revenue-chart?days=${days}`, { headers: { Authorization: `Bearer ${token}` } }),
+  getHealth: (token) => apiRequest("/admin/health", { headers: { Authorization: `Bearer ${token}` } }),
 };
 
 const ordersApi = {
@@ -1027,6 +1097,26 @@ const shopsApi = {
 const financeApi = {
   getMine: (token) => apiRequest("/me/financials", { headers: { Authorization: `Bearer ${token}` } }),
 };
+
+const notificationsApi = {
+  list: (token) => apiRequest("/notifications", { headers: { Authorization: `Bearer ${token}` } }),
+  unreadCount: (token) => apiRequest("/notifications/unread-count", { headers: { Authorization: `Bearer ${token}` } }),
+  markRead: (id, token) => apiRequest(`/notifications/${id}/read`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
+  markAllRead: (token) => apiRequest("/notifications/read-all", { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
+};
+
+function mapApiNotification(n) {
+  return {
+    id: n.id,
+    type: n.type,
+    title: n.title,
+    body: n.body,
+    refType: n.ref_type,
+    refId: n.ref_id,
+    readAt: n.read_at,
+    createdAt: n.created_at ? new Date(n.created_at).getTime() : Date.now(),
+  };
+}
 
 const messagesApi = {
   getOrderMessages: (orderId, token) => apiRequest(`/orders/${orderId}/messages`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -1194,6 +1284,7 @@ function mapApiListing(l) {
     id: l.id,
     sellerId: l.seller_id,
     shopId: l.shop_id,
+    images: l.images || [],
     title: l.title,
     category: l.category,
     vehicleType: l.vehicle_type || "car",
@@ -1388,13 +1479,14 @@ function ListingCard({ listing, shops, onOpen }) {
   const city = findCity(listing.city);
   const cur = lang === "ar" ? "د.ل" : listing.currency;
   const [imgFailed, setImgFailed] = useState(false);
-  const showImage = listing.image && !imgFailed;
+  const coverImage = listing.images?.[0]?.thumbnailUrl || listing.images?.[0]?.url;
+  const showImage = coverImage && !imgFailed;
   return (
     <button onClick={() => onOpen(listing)} className="relative text-left w-full rounded-2xl border transition-transform active:scale-[0.98]" style={{ borderColor: C.line, background: C.paper, boxShadow: "0 1px 2px rgba(18,24,31,0.06)" }}>
       <div className="relative flex items-center justify-center h-32 rounded-t-2xl overflow-hidden" style={{ background: showImage ? C.asphalt : `linear-gradient(160deg, ${C.sand}, ${C.sandLight})` }}>
         {showImage ? (
           <>
-            <img src={listing.image} alt="" onError={() => setImgFailed(true)} className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.88 }} />
+            <img src={coverImage} alt="" onError={() => setImgFailed(true)} className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.88 }} />
             {/* Brass duotone wash ties the photo to the brand palette and keeps badges legible */}
             <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, rgba(18,24,31,0.15) 0%, rgba(18,24,31,0.05) 45%, rgba(18,24,31,0.55) 100%)` }} />
           </>
@@ -1453,7 +1545,7 @@ function AppInner() {
   const [requests, setRequests] = useState([]);
   const [recentSearches, setRecentSearches] = useState([]);
   const [favoriteIds, setFavoriteIds] = useState([]);
-  const [notifications, setNotifications] = useState([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [messages, setMessages] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAddCar, setShowAddCar] = useState(false);
@@ -1555,7 +1647,7 @@ function AppInner() {
         if (!msg) await window.storage.set("messages", JSON.stringify(messagesData), true);
 
         setListings(listingsData); setShops(shopsData); setRevenue(revenueData); setRequests(requestsData); setOrders(ordersData);
-        setNotifications(notificationsData); setMessages(messagesData);
+        setMessages(messagesData);
         if (lg) setLang(lg);
 
         try {
@@ -1639,6 +1731,21 @@ function AppInner() {
     })();
   }, [screen, session?.token]);
 
+  // Real unread-notification count, fetched whenever someone's logged
+  // in — replaces what used to be a local fake count computed from
+  // entirely local demo data.
+  useEffect(() => {
+    if (!session?.token) { setUnreadNotificationCount(0); return; }
+    (async () => {
+      try {
+        const { count } = await notificationsApi.unreadCount(session.token);
+        setUnreadNotificationCount(count);
+      } catch (e) {
+        console.error("Could not load unread notification count.", e);
+      }
+    })();
+  }, [session?.token]);
+
   // Fetch the user's own shop (if any) whenever they're logged in — this
   // used to be derived from a locally-faked session.shopId; now it
   // reflects whatever the real backend actually knows about shop
@@ -1718,20 +1825,7 @@ function AppInner() {
   const persistListings = useCallback(async (next) => { setListings(next); try { await window.storage.set("listings", JSON.stringify(next), true); } catch (e) { console.error(e); } }, []);
   const persistRequests = useCallback(async (next) => { setRequests(next); try { await window.storage.set("requests", JSON.stringify(next), true); } catch (e) { console.error(e); } }, []);
   const persistOrders = useCallback(async (next) => { setOrders(next); try { await window.storage.set("orders", JSON.stringify(next), true); } catch (e) { console.error(e); } }, []);
-  const persistNotifications = useCallback(async (next) => { setNotifications(next); try { await window.storage.set("notifications", JSON.stringify(next), true); } catch (e) { console.error(e); } }, []);
   const persistMessages = useCallback(async (next) => { setMessages(next); try { await window.storage.set("messages", JSON.stringify(next), true); } catch (e) { console.error(e); } }, []);
-  // Fire-and-forget: reads the LATEST shared notifications via storage
-  // directly (not the `notifications` state closure) so rapid successive
-  // notifications from the same handler don't clobber each other.
-  const pushNotification = useCallback(async (userContact, type, title, refId) => {
-    try {
-      const current = (await window.storage.get("notifications", true)).value;
-      const list = current ? JSON.parse(current) : [];
-      const next = [{ id: `NOTIF-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, userContact, type, title, refId, readAt: null, createdAt: Date.now() }, ...list].slice(0, 300);
-      await window.storage.set("notifications", JSON.stringify(next), true);
-      setNotifications(next);
-    } catch (e) { console.error("Notification push failed", e); }
-  }, []);
   const persistShops = useCallback(async (next) => { setShops(next); try { await window.storage.set("shops", JSON.stringify(next), true); } catch (e) { console.error(e); } }, []);
   const commitSearch = useCallback(async (q) => {
     if (!q || !q.trim()) return;
@@ -1851,7 +1945,7 @@ function AppInner() {
           yearFrom: form.yearFrom, yearTo: form.yearTo, price: Number(form.price),
           condition: form.condition, city: form.city, description: form.description,
           protectedDeal: form.protectedDeal, shopId: myShop ? myShop.id : undefined,
-          vehicleType: form.vehicleType,
+          vehicleType: form.vehicleType, images: form.images.map((i) => ({ id: i.id, url: i.url, thumbnailUrl: i.thumbnailUrl })),
         },
         session.token
       );
@@ -1910,9 +2004,26 @@ function AppInner() {
     }
   }
   async function handleUpdateListing(listingId, form) {
-    await persistListings(listings.map((l) => (l.id === listingId ? { ...l, ...form } : l)));
-    flash(t("listingUpdatedToast"));
-    setEditingListing(null);
+    try {
+      const { listing: updated, needsReapproval } = await listingsApi.update(
+        listingId,
+        {
+          title: form.title, category: form.category, make: form.make, model: form.model,
+          yearFrom: form.yearFrom, yearTo: form.yearTo, price: form.price, condition: form.condition,
+          authenticity: form.authenticity, partNumber: form.partNumber, city: form.city,
+          description: form.description, protectedDeal: form.protectedDeal,
+          images: form.images.map((i) => ({ id: i.id, url: i.url, thumbnailUrl: i.thumbnailUrl })),
+        },
+        session.token
+      );
+      const mapped = mapApiListing(updated);
+      setListings(listings.map((l) => (l.id === listingId ? mapped : l)));
+      setMyListingsAll(myListingsAll.map((l) => (l.id === listingId ? mapped : l)));
+      flash(t(needsReapproval ? "listingUpdatedNeedsReviewToast" : "listingUpdatedToast"));
+      setEditingListing(null);
+    } catch (e) {
+      flash(e.message);
+    }
   }
   // 'draft' isn't a real status in the backend schema yet — only
   // active/removed are genuinely wired here. Republishing (removed ->
@@ -2112,13 +2223,35 @@ function AppInner() {
     }
   }
   async function handleMarkAllNotificationsRead() {
-    const next = notifications.map((n) => (n.userContact === session.contact && !n.readAt ? { ...n, readAt: Date.now() } : n));
-    await persistNotifications(next);
+    try {
+      await notificationsApi.markAllRead(session.token);
+      setUnreadNotificationCount(0);
+    } catch (e) {
+      flash(e.message);
+    }
   }
-  function handleOpenNotification(n) {
+  async function handleOpenNotification(n) {
     setShowNotifications(false);
-    const order = orders.find((o) => o.id === n.refId);
-    if (order) { setActiveOrder(order); setScreen("orderDetail"); }
+    try {
+      if (!n.readAt) {
+        await notificationsApi.markRead(n.id, session.token);
+        setUnreadNotificationCount((c) => Math.max(0, c - 1));
+      }
+      if (n.refType === "order") {
+        await refreshOrder(n.refId);
+        setScreen("orderDetail");
+      } else if (n.refType === "request") {
+        const { request, offers } = await requestsApi.get(n.refId, session.token);
+        setActiveRequest(mapApiRequest(request, offers));
+        setScreen("requestDetail");
+      } else if (n.refType === "listing") {
+        const { listing } = await listingsApi.get(n.refId);
+        setActiveListing(mapApiListing(listing));
+        setScreen("listing");
+      }
+    } catch (e) {
+      flash(e.message);
+    }
   }
 
   // --- Payments & Settlements -------------------------------------------
@@ -2205,7 +2338,7 @@ function AppInner() {
         )}
         {screen !== "admin" && (
           <TopBar session={session} onLogin={() => setShowLogin(true)} onAccount={() => setScreen("account")} onHome={() => { setScreen("home"); setCategory(null); setQuery(""); }} lang={lang} onToggleLang={() => changeLang(lang === "en" ? "ar" : "en")}
-            unreadCount={session ? notifications.filter((n) => n.userContact === session.contact && !n.readAt).length : 0}
+            unreadCount={unreadNotificationCount}
             onOpenNotifications={() => setShowNotifications(true)} />
         )}
         <main className="max-w-lg mx-auto pb-24" style={{ minHeight: "70vh" }}>
@@ -2308,7 +2441,7 @@ function AppInner() {
               onGoSellerCenter={() => setScreen("seller")} />
           )}
           {screen === "admin" && ["admin", "owner", "moderator"].includes(session?.role) && (
-            <AdminScreen listings={listings} revenue={revenue}
+            <AdminScreen listings={listings} revenue={revenue} session={session}
               pendingListings={pendingListings} onModerate={handleModerateListing}
               adminShops={adminShops} adminSettlements={adminSettlements} adminRefunds={adminRefunds} adminBankTransfers={adminBankTransfers}
               onVerify={handleVerifyShop} onRemove={handleRemoveListing} onExit={() => setScreen("home")}
@@ -2326,8 +2459,8 @@ function AppInner() {
           flash(t("adCreatedToast"));
           try { const { ads: apiAds } = await adsApi.getActive("home_banner"); setAds(apiAds); } catch (e) { console.error(e); }
         }} />}
-        {showPost && session && <PostListingModal onClose={() => setShowPost(false)} onSubmit={handlePostListing} isShop={!!myShop} />}
-        {editingListing && <EditListingModal listing={editingListing} onClose={() => setEditingListing(null)} onSubmit={(form) => handleUpdateListing(editingListing.id, form)} />}
+        {showPost && session && <PostListingModal onClose={() => setShowPost(false)} onSubmit={handlePostListing} isShop={!!myShop} session={session} />}
+        {editingListing && <EditListingModal listing={editingListing} session={session} onClose={() => setEditingListing(null)} onSubmit={handleUpdateListing} />}
         {showEditShop && myShop && <EditShopModal shop={myShop} onClose={() => setShowEditShop(false)} onSubmit={(form) => handleUpdateShop(myShop.id, form)} />}
         {showPostChoice && (
           <PostChoiceModal onClose={() => setShowPostChoice(false)}
@@ -2351,7 +2484,7 @@ function AppInner() {
         {showRefundRequest && session && <RefundRequestModal order={orders.find((o) => o.id === showRefundRequest)} onClose={() => setShowRefundRequest(null)} onSubmit={(form) => handleRequestRefund(showRefundRequest, form)} />}
         {showNotifications && session && (
           <NotificationsPanel
-            items={notifications.filter((n) => n.userContact === session.contact)}
+            session={session}
             onClose={() => setShowNotifications(false)}
             onMarkAllRead={handleMarkAllNotificationsRead}
             onOpen={handleOpenNotification} />
@@ -2821,8 +2954,15 @@ function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isO
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   const cond = findCondition(listing.condition);
   const city = findCity(listing.city);
-  const [imgFailed, setImgFailed] = useState(false);
-  const showImage = listing.image && !imgFailed;
+  const images = listing.images || [];
+  const hasImages = images.length > 0;
+  const [activeImg, setActiveImg] = useState(0);
+  const galleryRef = useRef(null);
+
+  function handleGalleryScroll(e) {
+    const { scrollLeft, clientWidth } = e.target;
+    setActiveImg(Math.round(scrollLeft / clientWidth));
+  }
 
   return (
     <div>
@@ -2832,14 +2972,25 @@ function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isO
           <Star size={15} color={isFavorite ? C.rust : C.steel} fill={isFavorite ? C.rust : "none"} />
         </button>
       </div>
-      <div className="mx-4 h-52 rounded-2xl flex items-center justify-center relative overflow-hidden" style={{ background: showImage ? C.asphalt : `linear-gradient(135deg, ${C.sand}, ${C.sandLight})` }}>
-        {showImage ? (
+      <div className="mx-4 h-52 rounded-2xl relative overflow-hidden" style={{ background: hasImages ? C.asphalt : `linear-gradient(135deg, ${C.sand}, ${C.sandLight})` }}>
+        {hasImages ? (
           <>
-            <img src={listing.image} alt="" onError={() => setImgFailed(true)} className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.9 }} />
-            <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, rgba(18,24,31,0.1) 0%, rgba(18,24,31,0.05) 40%, rgba(18,24,31,0.5) 100%)` }} />
+            <div ref={galleryRef} onScroll={handleGalleryScroll} className="absolute inset-0 flex overflow-x-auto" style={{ scrollSnapType: "x mandatory" }}>
+              {images.map((img, i) => (
+                <img key={img.id || i} src={img.url} alt="" className="w-full h-full object-cover flex-shrink-0" style={{ scrollSnapAlign: "center", opacity: 0.9 }} />
+              ))}
+            </div>
+            <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, rgba(18,24,31,0.1) 0%, rgba(18,24,31,0.05) 40%, rgba(18,24,31,0.5) 100%)`, pointerEvents: "none" }} />
+            {images.length > 1 && (
+              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                {images.map((_, i) => (
+                  <div key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: i === activeImg ? "#fff" : "rgba(255,255,255,0.4)" }} />
+                ))}
+              </div>
+            )}
           </>
         ) : (
-          <Icon size={64} strokeWidth={1.2} color={C.steel} />
+          <div className="absolute inset-0 flex items-center justify-center"><Icon size={64} strokeWidth={1.2} color={C.steel} /></div>
         )}
         {listing.protectedDeal && <div className="absolute top-3" style={{ [lang === "ar" ? "left" : "right"]: 12 }}><Badge tone="green" icon={ShieldCheck}>{t("protectedDeal")}</Badge></div>}
       </div>
@@ -3527,23 +3678,58 @@ function RefundRequestModal({ order, onClose, onSubmit }) {
   );
 }
 
-function NotificationsPanel({ items, onClose, onMarkAllRead, onOpen }) {
+function NotificationsPanel({ session, onClose, onMarkAllRead, onOpen }) {
   const { t, lang } = useLang();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { notifications } = await notificationsApi.list(session.token);
+        setItems(notifications.map(mapApiNotification));
+      } catch (e) {
+        console.error("Could not load notifications.", e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [session.token]);
+
+  // Falls back to the notification's own real stored title when no
+  // translated category label exists for this type — better than
+  // showing a raw untranslated key like "notif_new_offer".
+  const categoryLabel = (n) => {
+    const key = "notif_" + n.type;
+    return (T[lang] && T[lang][key]) ? t(key) : n.title;
+  };
+
+  async function handleOpen(n) {
+    setItems(items.map((i) => (i.id === n.id ? { ...i, readAt: i.readAt || Date.now() } : i)));
+    onOpen(n);
+  }
+  async function handleMarkAllRead() {
+    setItems(items.map((n) => ({ ...n, readAt: n.readAt || Date.now() })));
+    onMarkAllRead();
+  }
+
   const sorted = [...items].sort((a, b) => b.createdAt - a.createdAt);
   return (
     <Modal title={t("notificationsTitle")} onClose={onClose} wide>
-      {sorted.length === 0 ? (
+      {loading ? (
+        <p className="text-sm py-8 text-center" style={{ color: C.steel }}>{t("loading")}</p>
+      ) : sorted.length === 0 ? (
         <p className="text-sm py-8 text-center" style={{ color: C.steel }}>{t("noNotificationsYet")}</p>
       ) : (
         <>
-          <button onClick={onMarkAllRead} className="text-xs font-semibold mb-3" style={{ color: C.amberDark }}>{t("markAllReadBtn")}</button>
+          <button onClick={handleMarkAllRead} className="text-xs font-semibold mb-3" style={{ color: C.amberDark }}>{t("markAllReadBtn")}</button>
           <div className="space-y-1.5 max-h-96 overflow-y-auto">
             {sorted.map((n) => (
-              <button key={n.id} onClick={() => onOpen(n)} className="w-full text-left p-3 rounded-xl flex items-start gap-2.5" style={{ background: n.readAt ? "#fff" : C.amberLight, border: `1px solid ${C.line}` }}>
+              <button key={n.id} onClick={() => handleOpen(n)} className="w-full text-left p-3 rounded-xl flex items-start gap-2.5" style={{ background: n.readAt ? "#fff" : C.amberLight, border: `1px solid ${C.line}` }}>
                 <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ background: n.readAt ? "transparent" : C.amber }} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold" style={{ color: C.asphalt }}>{t("notif_" + n.type)}</p>
-                  <p dir="auto" className="text-xs mt-0.5 line-clamp-1" style={{ color: C.steel, unicodeBidi: "plaintext" }}>{n.title}</p>
+                  <p className="text-xs font-bold" style={{ color: C.asphalt }}>{categoryLabel(n)}</p>
+                  {n.body && <p dir="auto" className="text-xs mt-0.5 line-clamp-1" style={{ color: C.steel, unicodeBidi: "plaintext" }}>{n.body}</p>}
                 </div>
               </button>
             ))}
@@ -4017,9 +4203,107 @@ function PostChoiceModal({ onClose, onSell, onRequest }) {
   );
 }
 
-function PostListingModal({ onClose, onSubmit, isShop }) {
+// Shared across listing posting/editing, part requests, offers, and shop
+// logos/covers — same upload/progress/retry/reorder/remove behavior
+// everywhere, driven entirely by `purpose` and a max count.
+function ImageUploader({ images, onChange, purpose, session, maxImages = 10 }) {
+  const { t } = useLang();
+  const [uploading, setUploading] = useState([]);
+  const fileInputRef = useRef(null);
+
+  async function runUpload(pendingItem) {
+    try {
+      const { uploads: uploaded } = await uploadsApi.upload([pendingItem.file], purpose, session.token, (pct) => {
+        setUploading((prev) => prev.map((u) => (u.tempId === pendingItem.tempId ? { ...u, progress: pct } : u)));
+      });
+      onChange([...images, ...uploaded.map((u) => ({ id: u.id, url: u.url, thumbnailUrl: u.thumbnailUrl }))]);
+      setUploading((prev) => prev.filter((u) => u.tempId !== pendingItem.tempId));
+    } catch (err) {
+      setUploading((prev) => prev.map((u) => (u.tempId === pendingItem.tempId ? { ...u, error: err.message } : u)));
+    }
+  }
+
+  function handleFilesSelected(e) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ""; // lets the same file be picked again later if removed and re-added
+    if (!files.length) return;
+    const room = Math.max(0, maxImages - images.length - uploading.length);
+    const pending = files.slice(0, room).map((file) => ({ tempId: `tmp-${Date.now()}-${Math.random()}`, file, progress: 0, error: null }));
+    setUploading((prev) => [...prev, ...pending]);
+    pending.forEach(runUpload);
+  }
+
+  function retryUpload(tempId) {
+    const item = uploading.find((u) => u.tempId === tempId);
+    if (!item) return;
+    setUploading((prev) => prev.map((u) => (u.tempId === tempId ? { ...u, error: null, progress: 0 } : u)));
+    runUpload(item);
+  }
+
+  async function removeImage(img) {
+    onChange(images.filter((i) => i.id !== img.id));
+    try {
+      await uploadsApi.delete(img.id, session.token);
+    } catch (e) {
+      console.error("Could not delete image from storage (already removed from this listing).", e);
+    }
+  }
+
+  function moveImage(index, direction) {
+    const next = [...images];
+    const target = index + direction;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange(next);
+  }
+
+  const canAddMore = images.length + uploading.length < maxImages;
+
+  return (
+    <div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {images.map((img, i) => (
+          <div key={img.id} className="relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border" style={{ borderColor: C.line }}>
+            <img src={img.thumbnailUrl || img.url} alt="" className="w-full h-full object-cover" />
+            {i === 0 && <span className="absolute bottom-0 left-0 right-0 text-[9px] text-center py-0.5" style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}>{t("coverPhotoLabel")}</span>}
+            <button onClick={() => removeImage(img)} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}><X size={11} color="#fff" /></button>
+            <div className="absolute top-0.5 left-0.5 flex gap-0.5">
+              {i > 0 && <button onClick={() => moveImage(i, -1)} className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}><ChevronLeft size={11} color="#fff" /></button>}
+              {i < images.length - 1 && <button onClick={() => moveImage(i, 1)} className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}><ChevronRight size={11} color="#fff" /></button>}
+            </div>
+          </div>
+        ))}
+        {uploading.map((u) => (
+          <div key={u.tempId} className="relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border flex items-center justify-center" style={{ borderColor: u.error ? C.rust : C.line, background: C.sand }}>
+            {u.error ? (
+              <button onClick={() => retryUpload(u.tempId)} className="flex flex-col items-center gap-1">
+                <AlertTriangle size={16} color={C.rust} />
+                <span className="text-[9px] font-semibold" style={{ color: C.rust }}>{t("retryUploadBtn")}</span>
+              </button>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center" style={{ background: `conic-gradient(${C.amber} ${u.progress * 3.6}deg, ${C.sand} 0deg)` }}>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#fff" }}>
+                  <span className="text-[10px] font-bold" style={{ color: C.asphalt }}>{u.progress}%</span>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {canAddMore && (
+          <button onClick={() => fileInputRef.current?.click()} className="flex-shrink-0 w-20 h-20 rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-1" style={{ borderColor: C.line, color: C.steel }}>
+            <Camera size={18} />
+            <span className="text-[9px] font-semibold">{t("addPhotoBtn")}</span>
+          </button>
+        )}
+      </div>
+      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleFilesSelected} style={{ display: "none" }} />
+    </div>
+  );
+}
+
+function PostListingModal({ onClose, onSubmit, isShop, session }) {
   const { t, lang } = useLang();
-  const [form, setForm] = useState({ vehicleType: "car", title: "", category: CATEGORIES[0].id, make: MAKES_BY_TYPE.car[0], model: "", yearFrom: 2015, yearTo: 2020, engineTrim: "", price: "", stock: 1, condition: CONDITIONS[0].id, authenticity: "aftermarket", partNumber: "", city: CITIES[0].id, description: "", protectedDeal: true, deliveryAvailable: false });
+  const [form, setForm] = useState({ vehicleType: "car", title: "", category: CATEGORIES[0].id, make: MAKES_BY_TYPE.car[0], model: "", yearFrom: 2015, yearTo: 2020, engineTrim: "", price: "", stock: 1, condition: CONDITIONS[0].id, authenticity: "aftermarket", partNumber: "", city: CITIES[0].id, description: "", protectedDeal: true, deliveryAvailable: false, images: [] });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   // Switching vehicle type resets make to that type's first option —
   // otherwise a leftover selection like "Range Rover" could stay set
@@ -4029,6 +4313,9 @@ function PostListingModal({ onClose, onSubmit, isShop }) {
 
   return (
     <Modal title={isShop ? t("postTitleShop") : t("postTitleIndividual")} onClose={onClose} wide>
+      <Field label={t("photosField")}>
+        <ImageUploader images={form.images} onChange={(imgs) => set("images", imgs)} purpose="listing" session={session} maxImages={10} />
+      </Field>
       <Field label={t("vehicleTypeField")}>
         <div className="grid grid-cols-3 gap-2">
           {VEHICLE_TYPES.map((vt) => {
@@ -4082,15 +4369,15 @@ function PostListingModal({ onClose, onSubmit, isShop }) {
 /* ---------------------------------------------------------------------
    Edit listing modal
 --------------------------------------------------------------------- */
-function EditListingModal({ listing, onClose, onSubmit }) {
+function EditListingModal({ listing, session, onClose, onSubmit }) {
   const { t, lang } = useLang();
   const [form, setForm] = useState({
     title: listing.title, category: listing.category, make: listing.make, model: listing.model,
-    yearFrom: listing.yearFrom, yearTo: listing.yearTo, engineTrim: listing.engineTrim || "",
-    price: listing.price, stock: listing.stock ?? 1, condition: listing.condition,
+    yearFrom: listing.yearFrom, yearTo: listing.yearTo,
+    price: listing.price, condition: listing.condition,
     authenticity: listing.authenticity || "aftermarket", partNumber: listing.partNumber || "",
     city: listing.city, description: listing.description, protectedDeal: !!listing.protectedDeal,
-    deliveryAvailable: !!listing.deliveryAvailable,
+    images: listing.images || [],
   });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const valid = form.title.trim() && form.model.trim() && form.price;
@@ -4099,8 +4386,18 @@ function EditListingModal({ listing, onClose, onSubmit }) {
   // to the flat combined list when the correct one is already known.
   const editMakeOptions = MAKES_BY_TYPE[listing.vehicleType] || MAKES;
 
+  // Matches the backend's own safe/sensitive split exactly — changing
+  // any of these fields sends the listing back for re-moderation and
+  // hides it from public search until approved again, so the person
+  // making the edit should see that coming, not discover it after.
+  const SENSITIVE_FIELDS = ["make", "model", "yearFrom", "yearTo", "category", "condition", "authenticity", "partNumber"];
+  const touchedSensitive = SENSITIVE_FIELDS.some((f) => form[f] !== listing[f]);
+
   return (
     <Modal title={t("editListingModalTitle")} onClose={onClose} wide>
+      <Field label={t("photosField")}>
+        <ImageUploader images={form.images} onChange={(imgs) => set("images", imgs)} purpose="listing" session={session} maxImages={10} />
+      </Field>
       <Field label={t("titleField")}><input style={inputStyle} value={form.title} onChange={(e) => set("title", e.target.value)} /></Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label={t("categoryField")}><select style={inputStyle} value={form.category} onChange={(e) => set("category", e.target.value)}>{CATEGORIES.map((c) => <option key={c.id} value={c.id}>{label(c, lang)}</option>)}</select></Field>
@@ -4114,24 +4411,25 @@ function EditListingModal({ listing, onClose, onSubmit }) {
         <Field label={t("yearFrom")}><input type="number" style={inputStyle} value={form.yearFrom} onChange={(e) => set("yearFrom", +e.target.value)} /></Field>
         <Field label={t("yearTo")}><input type="number" style={inputStyle} value={form.yearTo} onChange={(e) => set("yearTo", +e.target.value)} /></Field>
       </div>
-      <Field label={t("engineTrimField")}><input style={inputStyle} value={form.engineTrim} onChange={(e) => set("engineTrim", e.target.value)} placeholder={t("engineTrimPlaceholder")} /></Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label={t("authenticityField")}><select style={inputStyle} value={form.authenticity} onChange={(e) => set("authenticity", e.target.value)}>{AUTHENTICITY.map((a) => <option key={a.id} value={a.id}>{label(a, lang)}</option>)}</select></Field>
         <Field label={t("partNumberField")}><input style={{ ...inputStyle, fontFamily: "'IBM Plex Mono', monospace" }} value={form.partNumber} onChange={(e) => set("partNumber", e.target.value)} placeholder={t("partNumberPlaceholder")} /></Field>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <Field label={t("priceField")}><input type="number" style={inputStyle} value={form.price} onChange={(e) => set("price", +e.target.value)} /></Field>
-        <Field label={t("stockField")}><input type="number" min="0" style={inputStyle} value={form.stock} onChange={(e) => set("stock", +e.target.value)} /></Field>
         <Field label={t("cityField")}><select style={inputStyle} value={form.city} onChange={(e) => set("city", e.target.value)}>{CITIES.map((c) => <option key={c.id} value={c.id}>{label(c, lang)}</option>)}</select></Field>
       </div>
       <Field label={t("descriptionField")}><textarea dir="auto" style={{ ...inputStyle, minHeight: 80 }} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
-      <label className="flex items-center gap-2 mb-2.5 text-sm" style={{ color: C.asphalt }}>
+      <label className="flex items-center gap-2 mb-4 text-sm" style={{ color: C.asphalt }}>
         <input type="checkbox" checked={form.protectedDeal} onChange={(e) => set("protectedDeal", e.target.checked)} /> {t("protectedCheckbox")}
       </label>
-      <label className="flex items-center gap-2 mb-4 text-sm" style={{ color: C.asphalt }}>
-        <input type="checkbox" checked={form.deliveryAvailable} onChange={(e) => set("deliveryAvailable", e.target.checked)} /> {t("deliveryOnlyFilter")}
-      </label>
-      <PrimaryButton full disabled={!valid} onClick={() => onSubmit({ ...form, price: Number(form.price), stock: Number(form.stock) })}>{t("updateListingBtn")}</PrimaryButton>
+      {touchedSensitive && (
+        <div className="mb-4 p-3 rounded-lg flex items-start gap-2" style={{ background: C.amberLight }}>
+          <AlertTriangle size={14} color={C.amberDark} className="mt-0.5 flex-shrink-0" />
+          <p className="text-xs" style={{ color: C.amberDark }}>{t("sensitiveEditWarning")}</p>
+        </div>
+      )}
+      <PrimaryButton full disabled={!valid} onClick={() => onSubmit(listing.id, { ...form, price: Number(form.price) })}>{t("updateListingBtn")}</PrimaryButton>
     </Modal>
   );
 }
@@ -4229,25 +4527,42 @@ function BoostModal({ onClose, onBoost }) {
 /* ---------------------------------------------------------------------
    ADMIN / OWNER DASHBOARD
 --------------------------------------------------------------------- */
-function AdminScreen({ listings, revenue, pendingListings, adminShops, adminSettlements, adminRefunds, adminBankTransfers, onModerate, onVerify, onRemove, onExit, onMarkCommissionSettled, onUpdateRefundStatus, onVerifyBankConfirmation }) {
+function AdminScreen({ listings, revenue, session, pendingListings, adminShops, adminSettlements, adminRefunds, adminBankTransfers, onModerate, onVerify, onRemove, onExit, onMarkCommissionSettled, onUpdateRefundStatus, onVerifyBankConfirmation }) {
   const { t, lang } = useLang();
   const [tab, setTab] = useState("overview");
   const activeListings = listings.filter((l) => l.status === "active");
   const pendingShops = adminShops.filter((s) => s.status !== "approved");
-  const totalRevenue = revenue.subscriptions + revenue.boosts + revenue.protection + (revenue.commission || 0);
 
-  const trend = useMemo(() => {
-    const months = lang === "ar" ? ["مار", "أبر", "ماي", "يون", "يول", "أغس"] : ["Mar", "Apr", "May", "Jun", "Jul", "Aug"];
-    const finalVal = Math.max(totalRevenue, 400);
-    return months.map((m, i) => ({ month: m, revenue: Math.round(finalVal * (0.35 + i * 0.13) * (0.85 + Math.random() * 0.3)) }));
-  }, [totalRevenue, lang]);
+  // Real business metrics, fetched fresh whenever the tab that shows
+  // them is actually open — not on every admin screen load, and never
+  // faked while waiting.
+  const [overview, setOverview] = useState(null);
+  const [health, setHealth] = useState(null);
+  useEffect(() => {
+    if (tab !== "overview") return;
+    (async () => {
+      try {
+        const [ov, hl] = await Promise.all([adminApi.getOverview(session.token), adminApi.getHealth(session.token)]);
+        setOverview(ov);
+        setHealth(hl);
+      } catch (e) {
+        console.error("Could not load overview.", e);
+      }
+    })();
+  }, [tab, session.token]);
 
-  const revenueBars = [
-    { name: t("src_subscriptions"), value: revenue.subscriptions, color: C.amber },
-    { name: t("src_boosts"), value: revenue.boosts, color: C.rust },
-    { name: t("src_protection"), value: revenue.protection, color: C.green },
-    { name: t("src_commission"), value: revenue.commission || 0, color: C.asphalt3 },
-  ];
+  const [revenueChart, setRevenueChart] = useState(null);
+  const [revenueDays, setRevenueDays] = useState(30);
+  useEffect(() => {
+    if (tab !== "revenue") return;
+    (async () => {
+      try {
+        setRevenueChart(await adminApi.getRevenueChart(revenueDays, session.token));
+      } catch (e) {
+        console.error("Could not load revenue chart.", e);
+      }
+    })();
+  }, [tab, revenueDays, session.token]);
 
   return (
     <div style={{ background: C.sandLight, minHeight: "100vh" }}>
@@ -4285,64 +4600,124 @@ function AdminScreen({ listings, revenue, pendingListings, adminShops, adminSett
           )
         )}
         {tab === "overview" && (
-          <>
-            {/* Known gap, flagged rather than hidden: these stat cards and
-                the trend line below are still not wired to real numbers
-                (GET /admin/overview and /admin/money exist and are ready
-                for this — it just wasn't done in this pass, to keep focus
-                on the tabs that move real money and real approvals). */}
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard icon={Package} label={t("statActiveListings")} value={activeListings.length} />
-              <StatCard icon={Store} label={t("statShops")} value={adminShops.length} sub={t("statPending", { n: pendingShops.length })} />
-              <StatCard icon={Users} label={t("statUsers")} value={new Set(listings.map((l) => l.sellerId)).size + adminShops.length} />
-              <StatCard icon={DollarSign} label={t("statRevenue")} value={`${totalRevenue.toLocaleString()} ${lang === "ar" ? "د.ل" : "LYD"}`} highlight />
-            </div>
-            <div className="mt-4 p-4 rounded-xl border" style={{ background: "#fff", borderColor: C.line }}>
-              <p className="text-xs font-semibold mb-3" style={{ color: C.steel, letterSpacing: 0.3 }}>{t("revenueTrend")}</p>
-              <ResponsiveContainer width="100%" height={180}>
-                <LineChart data={trend}>
-                  <CartesianGrid stroke={C.line} vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.steel }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: C.steel }} axisLine={false} tickLine={false} width={40} />
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: C.line }} />
-                  <Line type="monotone" dataKey="revenue" stroke={C.amber} strokeWidth={2.5} dot={{ r: 3 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            {pendingShops.length > 0 && (
-              <div className="mt-4 p-4 rounded-xl border" style={{ background: "#fff", borderColor: C.line }}>
-                <p className="text-xs font-semibold mb-3 flex items-center gap-1" style={{ color: C.rust }}><AlertTriangle size={13} /> {t("awaitingVer")}</p>
-                {pendingShops.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between py-2 border-t first:border-0" style={{ borderColor: C.line }}>
-                    <div><p className="text-sm font-semibold" style={{ color: C.asphalt }}>{s.name}</p><p className="text-xs" style={{ color: C.steel }}>{label(findCity(s.city), lang)} · {lang === "ar" ? FEES.tiers[s.tier].nameAr : FEES.tiers[s.tier].name}</p></div>
-                    <button onClick={() => onVerify(s.id)} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.greenLight, color: C.green }}>{t("verify")}</button>
-                  </div>
-                ))}
+          !overview ? (
+            <p className="text-sm py-10 text-center" style={{ color: C.steel }}>{t("loading")}</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard icon={Users} label={t("statTotalUsers")} value={overview.marketplace.totalUsers} sub={t("statActiveOf", { n: overview.marketplace.activeUsers })} />
+                <StatCard icon={Package} label={t("statActiveListings")} value={overview.marketplace.activeListings} sub={t("statTotalOf", { n: overview.marketplace.totalListings })} />
+                <StatCard icon={PackageSearch} label={t("statOpenRequests")} value={overview.marketplace.openRequests} />
+                <StatCard icon={DollarSign} label={t("statGMV")} value={`${overview.money.gmv.toLocaleString()} ${lang === "ar" ? "د.ل" : "LYD"}`} highlight />
               </div>
-            )}
-          </>
+
+              <p className="text-xs font-bold uppercase mt-5 mb-2" style={{ color: C.steel, letterSpacing: 0.5 }}>{t("sectionMoney")}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard icon={CircleDollarSign} label={t("statCommissionEarned")} value={`${overview.money.commissionEarned.toLocaleString()} LYD`} />
+                <StatCard icon={Clock} label={t("statCommissionOutstanding")} value={`${overview.money.commissionOutstanding.toLocaleString()} LYD`} />
+                <StatCard icon={CheckCircle2} label={t("statCommissionCollected")} value={`${overview.money.commissionCollected.toLocaleString()} LYD`} />
+                <StatCard icon={DollarSign} label={t("statAOV")} value={`${overview.money.averageOrderValue.toLocaleString()} LYD`} />
+              </div>
+
+              <p className="text-xs font-bold uppercase mt-5 mb-2" style={{ color: C.steel, letterSpacing: 0.5 }}>{t("sectionSupply")}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard icon={Store} label={t("statShops")} value={overview.supply.totalShops} sub={t("statVerifiedOf", { n: overview.supply.verifiedShops })} />
+                <StatCard icon={User} label={t("statIndividualSellers")} value={overview.supply.individualSellers} />
+                <StatCard icon={Users} label={t("statActiveSellers")} value={overview.supply.activeSellers} />
+                <StatCard icon={Rocket} label={t("statNewSellers")} value={overview.supply.newSellersThisWeek} sub={t("statThisWeek")} />
+              </div>
+
+              <p className="text-xs font-bold uppercase mt-5 mb-2" style={{ color: C.steel, letterSpacing: 0.5 }}>{t("sectionDemand")}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard icon={PackageSearch} label={t("statRequestsWeek")} value={overview.demand.requestsThisWeek} />
+                <StatCard icon={MessageCircle} label={t("statRequestsWithOffers")} value={overview.demand.requestsWithOffers} sub={t("statNoOfferOf", { n: overview.demand.requestsWithNoOffers })} />
+                <StatCard icon={Clock} label={t("statAvgTimeToOffer")} value={overview.demand.averageHoursToFirstOffer !== null ? t("statHours", { n: overview.demand.averageHoursToFirstOffer }) : t("statNoData")} />
+                <StatCard icon={Package} label={t("statAvgOffersPerRequest")} value={overview.demand.averageOffersPerRequestWithOffers} />
+              </div>
+
+              <p className="text-xs font-bold uppercase mt-5 mb-2" style={{ color: C.steel, letterSpacing: 0.5 }}>{t("sectionOperations")}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard icon={Clock} label={t("statAwaitingAcceptance")} value={overview.operations.ordersAwaitingAcceptance} />
+                <StatCard icon={Truck} label={t("statInDelivery")} value={overview.operations.ordersInDelivery} />
+                <StatCard icon={AlertOctagon} label={t("statOpenDisputes")} value={overview.operations.openDisputes} />
+                <StatCard icon={AlertTriangle} label={t("statFailedPayments")} value={overview.operations.failedPayments} />
+              </div>
+
+              {health && (
+                <div className="mt-5 p-4 rounded-xl border" style={{ background: "#fff", borderColor: C.line }}>
+                  <p className="text-xs font-bold uppercase mb-3" style={{ color: C.steel, letterSpacing: 0.5 }}>{t("marketplaceHealth")}</p>
+                  <div className="space-y-2">
+                    {[
+                      { label: t("healthOrderCompletion"), h: health.orderCompletion, fmt: (v) => `${Math.round(v * 100)}%` },
+                      { label: t("healthPaymentSuccess"), h: health.paymentSuccess, fmt: (v) => `${Math.round(v * 100)}%` },
+                      { label: t("healthRequestsGettingOffers"), h: health.requestsGettingOffers, fmt: () => `${Math.round((1 - health.requestsGettingOffers.noOfferRate) * 100)}%` },
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-center justify-between">
+                        <span className="text-sm" style={{ color: C.asphalt }}>{row.label}</span>
+                        <span className="text-xs font-semibold flex items-center gap-1.5" style={{ color: { good: C.green, warning: C.amberDark, bad: C.rust, unknown: C.steel }[row.h.status] }}>
+                          <span className="w-2 h-2 rounded-full" style={{ background: { good: C.green, warning: C.amber, bad: C.rust, unknown: C.steel }[row.h.status] }} />
+                          {row.h.status === "unknown" ? t("healthUnknown") : row.fmt(row.h.rate)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm" style={{ color: C.asphalt }}>{t("healthSellersNoSales")}</span>
+                      <span className="text-xs font-semibold" style={{ color: C.steel }}>{health.sellersWithNoSales.count}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {pendingShops.length > 0 && (
+                <div className="mt-4 p-4 rounded-xl border" style={{ background: "#fff", borderColor: C.line }}>
+                  <p className="text-xs font-semibold mb-3 flex items-center gap-1" style={{ color: C.rust }}><AlertTriangle size={13} /> {t("awaitingVer")}</p>
+                  {pendingShops.map((s) => (
+                    <div key={s.id} className="flex items-center justify-between py-2 border-t first:border-0" style={{ borderColor: C.line }}>
+                      <div><p className="text-sm font-semibold" style={{ color: C.asphalt }}>{s.name}</p><p className="text-xs" style={{ color: C.steel }}>{label(findCity(s.city), lang)} · {lang === "ar" ? FEES.tiers[s.tier].nameAr : FEES.tiers[s.tier].name}</p></div>
+                      <button onClick={() => onVerify(s.id)} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.greenLight, color: C.green }}>{t("verify")}</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )
         )}
         {tab === "revenue" && (
           <>
-            <div className="p-4 rounded-xl border mb-4" style={{ background: "#fff", borderColor: C.line }}>
-              <p className="text-xs font-semibold mb-3" style={{ color: C.steel, letterSpacing: 0.3 }}>{t("revenueBySource")}</p>
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={revenueBars} layout="vertical" margin={{ left: 10 }}>
-                  <XAxis type="number" tick={{ fontSize: 11, fill: C.steel }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: C.asphalt }} axisLine={false} tickLine={false} width={130} />
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                  <Bar dataKey="value" radius={[0, 6, 6, 0]} fill={C.amber} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="space-y-2">
-              {revenueBars.map((b) => (
-                <div key={b.name} className="flex items-center justify-between p-3 rounded-xl border" style={{ background: "#fff", borderColor: C.line }}>
-                  <span className="text-sm font-semibold flex items-center gap-2" style={{ color: C.asphalt }}><span className="w-2.5 h-2.5 rounded-full" style={{ background: b.color }} />{b.name}</span>
-                  <PriceTag amount={b.value} />
-                </div>
+            <div className="flex gap-1.5 mb-4">
+              {[{ id: 1, l: t("periodToday") }, { id: 7, l: t("period7d") }, { id: 30, l: t("period30d") }, { id: 90, l: t("period90d") }].map((p) => (
+                <button key={p.id} onClick={() => setRevenueDays(p.id)} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: revenueDays === p.id ? C.amber : C.sand, color: revenueDays === p.id ? "#fff" : C.asphalt }}>{p.l}</button>
               ))}
             </div>
+            {!revenueChart ? (
+              <p className="text-sm py-10 text-center" style={{ color: C.steel }}>{t("loading")}</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <StatCard icon={DollarSign} label={t("statGMV")} value={`${revenueChart.totals.gmv.toLocaleString()} LYD`} highlight />
+                  <StatCard icon={CircleDollarSign} label={t("statCommissionEarned")} value={`${revenueChart.totals.commission.toLocaleString()} LYD`} />
+                  <StatCard icon={AlertOctagon} label={t("statRefunds")} value={`${revenueChart.totals.refunds.toLocaleString()} LYD`} />
+                  <StatCard icon={CheckCircle2} label={t("statNetRevenue")} value={`${revenueChart.totals.net.toLocaleString()} LYD`} />
+                </div>
+                <div className="p-4 rounded-xl border" style={{ background: "#fff", borderColor: C.line }}>
+                  <p className="text-xs font-semibold mb-3" style={{ color: C.steel, letterSpacing: 0.3 }}>{t("revenueTrend")}</p>
+                  {revenueChart.series.length === 0 ? (
+                    <p className="text-sm text-center py-6" style={{ color: C.steel }}>{t("statNoData")}</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart data={revenueChart.series}>
+                        <CartesianGrid stroke={C.line} vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: C.steel }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: C.steel }} axisLine={false} tickLine={false} width={40} />
+                        <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: C.line }} />
+                        <Line type="monotone" dataKey="gmv" stroke={C.amber} strokeWidth={2.5} dot={{ r: 2 }} name={t("statGMV")} />
+                        <Line type="monotone" dataKey="commission" stroke={C.green} strokeWidth={2} dot={{ r: 2 }} name={t("statCommissionEarned")} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </>
+            )}
             <div className="mt-4 p-4 rounded-xl" style={{ background: C.asphalt }}>
               <p className="text-xs font-semibold mb-1" style={{ color: C.steelLight }}>{t("feeStructure")}</p>
               <ul className="text-xs space-y-1 mt-2" style={{ color: "#fff" }}>
