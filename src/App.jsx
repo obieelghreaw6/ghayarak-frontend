@@ -104,6 +104,7 @@ const T = {
     noMatchTitle: "No parts match yet",
     noMatchSub: "Try another category, city, or search term.",
     back: "Back",
+    cancel: "Cancel", confirmTitle: "Are you sure?", listingDeletedToast: "Listing deleted.",
     descriptionLabel: "DESCRIPTION",
     views: "views", daysAgo: "d ago",
     markAsSold: "Mark as sold",
@@ -506,6 +507,7 @@ const T = {
     noMatchTitle: "لا توجد قطع مطابقة بعد",
     noMatchSub: "جرّب قسمًا آخر، مدينة أخرى، أو كلمة بحث مختلفة.",
     back: "رجوع",
+    cancel: "إلغاء", confirmTitle: "هل أنت متأكد؟", listingDeletedToast: "تم حذف الإعلان.",
     descriptionLabel: "الوصف",
     views: "مشاهدة", daysAgo: "يوم مضى",
     markAsSold: "تحديد كمُباع",
@@ -1979,7 +1981,6 @@ function AppInner() {
     }
   }
   async function handleDeleteShop(shopId) {
-    if (!window.confirm(t("confirmDeleteShop"))) return;
     try {
       await adminApi.deleteShop(shopId, session.token);
       setAdminShops(adminShops.filter((s) => s.id !== shopId));
@@ -2460,7 +2461,7 @@ function AppInner() {
               onGoSellerCenter={() => setScreen("seller")} />
           )}
           {screen === "admin" && ["admin", "owner", "moderator"].includes(session?.role) && (
-            <AdminScreen listings={listings} revenue={revenue} session={session}
+            <AdminScreen listings={listings} revenue={revenue} session={session} flash={flash}
               pendingListings={pendingListings} onModerate={handleModerateListing}
               adminShops={adminShops} adminSettlements={adminSettlements} adminRefunds={adminRefunds} adminBankTransfers={adminBankTransfers}
               onVerify={handleVerifyShop} onRemove={handleRemoveListing} onDeleteShop={handleDeleteShop} onExit={() => setScreen("home")}
@@ -4546,7 +4547,7 @@ function BoostModal({ onClose, onBoost }) {
 /* ---------------------------------------------------------------------
    ADMIN / OWNER DASHBOARD
 --------------------------------------------------------------------- */
-function AdminScreen({ listings, revenue, session, pendingListings, adminShops, adminSettlements, adminRefunds, adminBankTransfers, onModerate, onVerify, onRemove, onDeleteShop, onExit, onMarkCommissionSettled, onUpdateRefundStatus, onVerifyBankConfirmation }) {
+function AdminScreen({ listings, revenue, session, flash, pendingListings, adminShops, adminSettlements, adminRefunds, adminBankTransfers, onModerate, onVerify, onRemove, onDeleteShop, onExit, onMarkCommissionSettled, onUpdateRefundStatus, onVerifyBankConfirmation }) {
   const { t, lang } = useLang();
   const [tab, setTab] = useState("overview");
   const activeListings = listings.filter((l) => l.status === "active");
@@ -4604,14 +4605,15 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
   }, [tab, session.token]);
 
   async function handleDeleteListing(id) {
-    if (!window.confirm(t("confirmDeleteListing"))) return;
     try {
       await adminApi.deleteListing(id, session.token);
       setAllListings((prev) => prev.filter((l) => l.id !== id));
+      flash(t("listingDeletedToast"));
     } catch (e) {
-      alert(e.message);
+      flash(e.message);
     }
   }
+  const [confirmAction, setConfirmAction] = useState(null); // { message, onConfirm }
 
   return (
     <div style={{ background: C.sandLight, minHeight: "100vh" }}>
@@ -4792,7 +4794,7 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
                   </div>
                   <div className="flex gap-1.5 flex-shrink-0">
                     {l.status === "active" && <button onClick={() => onRemove(l.id)} className="p-2 rounded-lg" style={{ background: C.amberLight }} title={t("removeListingBtn")}><EyeOff size={14} color={C.amberDark} /></button>}
-                    <button onClick={() => handleDeleteListing(l.id)} className="p-2 rounded-lg" style={{ background: C.rustLight }} title={t("deletePermanentlyBtn")}><Trash2 size={14} color={C.rust} /></button>
+                    <button onClick={() => setConfirmAction({ message: t("confirmDeleteListing"), onConfirm: () => handleDeleteListing(l.id) })} className="p-2 rounded-lg" style={{ background: C.rustLight }} title={t("deletePermanentlyBtn")}><Trash2 size={14} color={C.rust} /></button>
                   </div>
                 </div>
               ))}
@@ -4813,7 +4815,7 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
                   <p className="text-xs mt-1" style={{ color: C.steel }}>{s.ownerName} · {label(findCity(s.city), lang)} · {s.listingCount} {t("listingsCount")} · <Badge tone={s.status === "approved" ? "green" : "amber"}>{s.status}</Badge></p>
                   <div className="flex gap-1.5 mt-2">
                     {s.status !== "approved" && <button onClick={() => onVerify(s.id)} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.greenLight, color: C.green }}>{t("verifyShop")}</button>}
-                    <button onClick={() => onDeleteShop(s.id)} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.rustLight, color: C.rust }}>{t("deletePermanentlyBtn")}</button>
+                    <button onClick={() => setConfirmAction({ message: t("confirmDeleteShop"), onConfirm: () => onDeleteShop(s.id) })} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.rustLight, color: C.rust }}>{t("deletePermanentlyBtn")}</button>
                   </div>
                 </div>
               ))}
@@ -4888,6 +4890,15 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
           )
         )}
       </div>
+      {confirmAction && (
+        <Modal title={t("confirmTitle")} onClose={() => setConfirmAction(null)}>
+          <p className="text-sm mb-4" style={{ color: C.asphalt }}>{confirmAction.message}</p>
+          <div className="flex gap-2">
+            <GhostButton full onClick={() => setConfirmAction(null)}>{t("cancel")}</GhostButton>
+            <PrimaryButton full onClick={() => { confirmAction.onConfirm(); setConfirmAction(null); }} style={{ background: C.rust }}>{t("deletePermanentlyBtn")}</PrimaryButton>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
