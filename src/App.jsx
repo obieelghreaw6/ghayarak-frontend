@@ -225,6 +225,10 @@ const T = {
     acceptOfferBtn: "Accept this offer",
     offerAcceptedToast: "Offer accepted — contact the seller to arrange the deal.",
     requestStatusOpen: "open", requestStatusMatched: "matched", requestStatusClosed: "closed",
+    requestStatusExpired: "expired", requestStatusCancelled: "cancelled",
+    expiresToday: "Expires today", expiresInDays: "Expires in {n} days",
+    renewRequestBtn: "Renew for 7 more days", cancelRequestBtn: "Cancel request", messageBtn: "Message",
+    requestCancelledToast: "Request cancelled.", requestRenewedToast: "Renewed for 7 more days.",
     requestFrom: "Requested by",
     yourOffer: "Your offer",
     contactToArrange: "Contact",
@@ -605,6 +609,10 @@ const T = {
     acceptOfferBtn: "قبول هذا العرض",
     offerAcceptedToast: "تم قبول العرض — تواصل مع البائع لإتمام الصفقة.",
     requestStatusOpen: "مفتوح", requestStatusMatched: "تم التوصل", requestStatusClosed: "مغلق",
+    requestStatusExpired: "منتهي", requestStatusCancelled: "ملغى",
+    expiresToday: "ينتهي اليوم", expiresInDays: "ينتهي خلال {n} أيام",
+    renewRequestBtn: "تجديد لمدة 7 أيام أخرى", cancelRequestBtn: "إلغاء الطلب", messageBtn: "رسالة",
+    requestCancelledToast: "تم إلغاء الطلب.", requestRenewedToast: "تم التجديد لمدة 7 أيام أخرى.",
     requestFrom: "طلب من",
     yourOffer: "عرضك",
     contactToArrange: "تواصل",
@@ -933,7 +941,7 @@ const findBusinessType = (id) => BUSINESS_TYPES.find((b) => b.id === id) || BUSI
 // ---------------------------------------------------------------------
 const API_BASE = "https://ghayarak-backend-production.up.railway.app";
 
-async function apiRequest(path, options = {}) {
+async function apiRequest(path, options = {}, retriesLeft = 2) {
   let res;
   try {
     res = await fetch(`${API_BASE}${path}`, {
@@ -941,8 +949,16 @@ async function apiRequest(path, options = {}) {
       headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     });
   } catch (e) {
-    // Network failure (server asleep, no connection, CORS, etc.) — surface
-    // a real error rather than letting the caller silently hang.
+    // A real network-level failure (not a server error response — the
+    // request never got a response at all) is often just a cold start on
+    // a service that's been idle, not a real problem. Retry a couple
+    // times with a short backoff before actually giving up, rather than
+    // showing an error for something that would have worked on its own a
+    // second later.
+    if (retriesLeft > 0) {
+      await new Promise((r) => setTimeout(r, 1200));
+      return apiRequest(path, options, retriesLeft - 1);
+    }
     throw new Error("Couldn't reach the server. Check your connection and try again.");
   }
   let data = {};
@@ -1018,14 +1034,19 @@ const messagesApi = {
   getListingMessages: (listingId, withUserId, token) => apiRequest(`/listings/${listingId}/messages${withUserId ? "?withUserId=" + withUserId : ""}`, { headers: { Authorization: `Bearer ${token}` } }),
   getListingConversations: (listingId, token) => apiRequest(`/listings/${listingId}/conversations`, { headers: { Authorization: `Bearer ${token}` } }),
   sendListingMessage: (listingId, body, recipientId, token) => apiRequest(`/listings/${listingId}/messages`, { method: "POST", body: JSON.stringify({ body, recipientId }), headers: { Authorization: `Bearer ${token}` } }),
+  getRequestMessages: (requestId, withUserId, token) => apiRequest(`/requests/${requestId}/messages${withUserId ? "?withUserId=" + withUserId : ""}`, { headers: { Authorization: `Bearer ${token}` } }),
+  getRequestConversations: (requestId, token) => apiRequest(`/requests/${requestId}/conversations`, { headers: { Authorization: `Bearer ${token}` } }),
+  sendRequestMessage: (requestId, body, recipientId, token) => apiRequest(`/requests/${requestId}/messages`, { method: "POST", body: JSON.stringify({ body, recipientId }), headers: { Authorization: `Bearer ${token}` } }),
 };
 
 const requestsApi = {
-  list: (params) => apiRequest(`/requests${params ? "?" + new URLSearchParams(params) : ""}`),
-  get: (id) => apiRequest(`/requests/${id}`),
+  list: (params, token) => apiRequest(`/requests${params ? "?" + new URLSearchParams(params) : ""}`, token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+  get: (id, token) => apiRequest(`/requests/${id}`, token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
   create: (body, token) => apiRequest("/requests", { method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
   makeOffer: (id, body, token) => apiRequest(`/requests/${id}/offers`, { method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
   acceptOffer: (id, offerId, token) => apiRequest(`/requests/${id}/accept-offer`, { method: "POST", body: JSON.stringify({ offerId }), headers: { Authorization: `Bearer ${token}` } }),
+  cancel: (id, token) => apiRequest(`/requests/${id}/cancel`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
+  renew: (id, token) => apiRequest(`/requests/${id}/renew`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
 };
 
 function mapApiMessage(m) {
@@ -1044,6 +1065,7 @@ function mapApiMessage(m) {
 function mapApiOffer(o) {
   return {
     id: o.id,
+    sellerId: o.seller_id,
     shopId: o.shop_id,
     sellerName: o.shop_name || o.seller_name,
     sellerContact: o.seller_contact,
@@ -1064,6 +1086,7 @@ function mapApiOffer(o) {
 function mapApiRequest(r, offers) {
   return {
     id: r.id,
+    requesterId: r.requester_id,
     requesterName: r.requester_name,
     requesterContact: r.requester_contact,
     make: r.make,
@@ -1075,6 +1098,7 @@ function mapApiRequest(r, offers) {
     urgency: r.urgency,
     status: r.status,
     acceptedOfferId: r.accepted_offer_id,
+    expiresAt: r.expires_at ? new Date(r.expires_at).getTime() : null,
     createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
     offers: offers ? offers.map(mapApiOffer) : new Array(Number(r.offer_count) || 0).fill(null),
   };
@@ -1447,8 +1471,8 @@ function AppInner() {
   const [activeRequest, setActiveRequest] = useState(null);
   const [activeOrder, setActiveOrder] = useState(null);
   const [activeShopId, setActiveShopId] = useState(null);
-  const [showListingMessage, setShowListingMessage] = useState(null);
-  const [showListingConversations, setShowListingConversations] = useState(null);
+  const [showThreadMessage, setShowThreadMessage] = useState(null);
+  const [showThreadConversations, setShowThreadConversations] = useState(null);
   const [activeShop, setActiveShop] = useState(null);
   const [editingListing, setEditingListing] = useState(null);
   const [category, setCategory] = useState(null);
@@ -1653,7 +1677,7 @@ function AppInner() {
     if (screen !== "requests") return;
     (async () => {
       try {
-        const { requests: apiRequests } = await requestsApi.list();
+        const { requests: apiRequests } = await requestsApi.list(null, session?.token);
         setRequests(apiRequests.map((r) => mapApiRequest(r)));
       } catch (e) {
         console.error("Could not load requests.", e);
@@ -1916,7 +1940,7 @@ function AppInner() {
   // would crash the moment a request has any real offers.
   async function handleOpenRequest(r) {
     try {
-      const { request, offers } = await requestsApi.get(r.id);
+      const { request, offers } = await requestsApi.get(r.id, session?.token);
       setActiveRequest(mapApiRequest(request, offers));
       setScreen("requestDetail");
     } catch (e) {
@@ -1942,7 +1966,7 @@ function AppInner() {
       // Refetch the full detail rather than hand-building the offer
       // locally — the server fills in seller name/contact from the real
       // account, which we don't want to fake client-side.
-      const { request, offers } = await requestsApi.get(requestId);
+      const { request, offers } = await requestsApi.get(requestId, session.token);
       const mapped = mapApiRequest(request, offers);
       setActiveRequest(mapped);
       setRequests(requests.map((r) => (r.id === requestId ? mapped : r)));
@@ -1955,11 +1979,34 @@ function AppInner() {
   async function handleAcceptOffer(requestId, offerId) {
     try {
       await requestsApi.acceptOffer(requestId, offerId, session.token);
-      const { request, offers } = await requestsApi.get(requestId);
+      const { request, offers } = await requestsApi.get(requestId, session.token);
       const mapped = mapApiRequest(request, offers);
       setActiveRequest(mapped);
       setRequests(requests.map((r) => (r.id === requestId ? mapped : r)));
       flash(t("offerAcceptedToast"));
+    } catch (e) {
+      flash(e.message);
+    }
+  }
+  async function handleCancelRequest(requestId) {
+    try {
+      const { request } = await requestsApi.cancel(requestId, session.token);
+      const mapped = mapApiRequest(request, activeRequest?.offers?.filter(Boolean));
+      setActiveRequest(mapped);
+      setRequests(requests.map((r) => (r.id === requestId ? mapped : r)));
+      flash(t("requestCancelledToast"));
+      setScreen("requests");
+    } catch (e) {
+      flash(e.message);
+    }
+  }
+  async function handleRenewRequest(requestId) {
+    try {
+      const { request } = await requestsApi.renew(requestId, session.token);
+      const mapped = mapApiRequest(request, activeRequest?.offers?.filter(Boolean));
+      setActiveRequest(mapped);
+      setRequests(requests.map((r) => (r.id === requestId ? mapped : r)));
+      flash(t("requestRenewedToast"));
     } catch (e) {
       flash(e.message);
     }
@@ -2211,8 +2258,8 @@ function AppInner() {
               onOpenShop={(id) => { setActiveShopId(id); setScreen("shop"); }}
               isFavorite={favoriteIds.includes(activeListing.id)}
               onToggleFavorite={() => requireLogin(() => toggleFavorite(activeListing.id))}
-              onMessageSeller={() => requireLogin(() => setShowListingMessage({ listingId: activeListing.id }))}
-              onViewConversations={() => setShowListingConversations(activeListing.id)} />
+              onMessageSeller={() => requireLogin(() => setShowThreadMessage({ scope: "listing", scopeId: activeListing.id }))}
+              onViewConversations={() => setShowThreadConversations({ scope: "listing", scopeId: activeListing.id })} />
           )}
           {screen === "requests" && (
             <RequestsScreen requests={requests} session={session}
@@ -2224,7 +2271,10 @@ function AppInner() {
               onBack={() => setScreen("requests")}
               onOffer={() => requireLogin(() => setShowOffer(activeRequest.id))}
               onAccept={(offerId) => handleAcceptOffer(activeRequest.id, offerId)}
-              onContact={(contact) => flash(t("callToast", { phone: contact }))} />
+              onCancel={() => handleCancelRequest(activeRequest.id)}
+              onRenew={() => handleRenewRequest(activeRequest.id)}
+              onMessage={(sellerId, sellerName) => setShowThreadMessage({ scope: "request", scopeId: activeRequest.id, otherPartyId: sellerId, otherPartyName: sellerName })}
+              onViewConversations={() => setShowThreadConversations({ scope: "request", scopeId: activeRequest.id })} />
           )}
           {screen === "orderDetail" && activeOrder && (
             <OrderDetail order={activeOrder} session={session}
@@ -2243,7 +2293,7 @@ function AppInner() {
           )}
           {screen === "account" && (
             <AccountScreen session={session} myShop={myShop} listings={myListingsAll}
-              myRequests={requests.filter((r) => r.requesterContact === session?.contact)}
+              myRequests={requests.filter((r) => r.requesterId === session?.id)}
               myOrders={orders.filter((o) => o.buyerContact === session?.contact)}
               mySales={orders.filter((o) => o.sellerContact === session?.contact)}
               onLogout={async () => { await persistSession(null); setScreen("home"); }}
@@ -2290,12 +2340,12 @@ function AppInner() {
         {showNewRequest && session && <NewRequestModal onClose={() => setShowNewRequest(false)} onSubmit={handleCreateRequest} />}
         {showOffer && session && <OfferModal onClose={() => setShowOffer(null)} onSubmit={(form) => handleSubmitOffer(showOffer, form)} />}
         {showBuy && session && <BuyModal listing={showBuy} onClose={() => setShowBuy(null)} onSubmit={(form) => handleCreateOrder(showBuy, form)} />}
-        {showListingMessage && session && (
-          <ListingMessageModal listingId={showListingMessage.listingId} otherPartyId={showListingMessage.otherPartyId} otherPartyName={showListingMessage.otherPartyName} session={session} onClose={() => setShowListingMessage(null)} />
+        {showThreadMessage && session && (
+          <ThreadMessageModal scope={showThreadMessage.scope} scopeId={showThreadMessage.scopeId} otherPartyId={showThreadMessage.otherPartyId} otherPartyName={showThreadMessage.otherPartyName} session={session} onClose={() => setShowThreadMessage(null)} />
         )}
-        {showListingConversations && session && (
-          <ListingConversationsModal listingId={showListingConversations} session={session} onClose={() => setShowListingConversations(null)}
-            onOpenThread={(otherPartyId, otherPartyName) => { setShowListingConversations(null); setShowListingMessage({ listingId: showListingConversations, otherPartyId, otherPartyName }); }} />
+        {showThreadConversations && session && (
+          <ThreadConversationsModal scope={showThreadConversations.scope} scopeId={showThreadConversations.scopeId} session={session} onClose={() => setShowThreadConversations(null)}
+            onOpenThread={(otherPartyId, otherPartyName) => { const prev = showThreadConversations; setShowThreadConversations(null); setShowThreadMessage({ scope: prev.scope, scopeId: prev.scopeId, otherPartyId, otherPartyName }); }} />
         )}
         {showDispute && session && <DisputeModal onClose={() => setShowDispute(null)} onSubmit={(form) => handleSubmitDispute(showDispute, form)} />}
         {showRefundRequest && session && <RefundRequestModal order={orders.find((o) => o.id === showRefundRequest)} onClose={() => setShowRefundRequest(null)} onSubmit={(form) => handleRequestRefund(showRefundRequest, form)} />}
@@ -2878,7 +2928,13 @@ function RequestCard({ request, onOpen }) {
           <p className="text-sm font-bold" style={{ color: C.asphalt }}>{request.make} {request.model} {request.year ? `· ${request.year}` : ""}</p>
           <p dir="auto" className="text-xs mt-1 line-clamp-2" style={{ color: C.steel, unicodeBidi: "plaintext" }}>{request.partDescription}</p>
         </div>
-        {request.urgency === "asap" && <Badge tone="rust">{label(urgency, lang)}</Badge>}
+        {request.status === "expired" ? (
+          <Badge tone="rust">{t("requestStatusExpired")}</Badge>
+        ) : request.status === "cancelled" ? (
+          <Badge tone="neutral">{t("requestStatusCancelled")}</Badge>
+        ) : request.urgency === "asap" ? (
+          <Badge tone="rust">{label(urgency, lang)}</Badge>
+        ) : null}
       </div>
       <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t" style={{ borderColor: C.line }}>
         <span className="text-xs flex items-center gap-1" style={{ color: C.steel }}><MapPin size={11} />{label(city, lang)}</span>
@@ -2928,14 +2984,16 @@ function RequestsScreen({ requests, session, onOpen, onNewRequest }) {
   );
 }
 
-function RequestDetail({ request, session, myShop, onBack, onOffer, onAccept, onContact }) {
+function RequestDetail({ request, session, myShop, onBack, onOffer, onAccept, onCancel, onRenew, onMessage, onViewConversations }) {
   const { t, lang, dir } = useLang();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   const city = findCity(request.city);
   const urgency = findUrgency(request.urgency);
   const cond = request.conditionPreference === "any" ? null : findCondition(request.conditionPreference);
-  const isRequester = session && session.contact === request.requesterContact;
+  const isRequester = session && session.id === request.requesterId;
   const canOffer = session && !isRequester;
+  const canManage = isRequester && ["open", "expired"].includes(request.status);
+  const daysLeft = request.expiresAt ? Math.ceil((request.expiresAt - Date.now()) / 86400000) : null;
 
   return (
     <div className="px-4 pt-3">
@@ -2943,7 +3001,7 @@ function RequestDetail({ request, session, myShop, onBack, onOffer, onAccept, on
 
       <div className="p-4 rounded-xl border" style={{ borderColor: C.line, background: "#fff" }}>
         <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <Badge tone={request.status === "open" ? "green" : request.status === "matched" ? "amber" : "neutral"}>{t("requestStatus" + request.status.charAt(0).toUpperCase() + request.status.slice(1))}</Badge>
+          <Badge tone={request.status === "open" ? "green" : request.status === "matched" ? "amber" : request.status === "expired" ? "rust" : "neutral"}>{t("requestStatus" + request.status.charAt(0).toUpperCase() + request.status.slice(1))}</Badge>
           {request.urgency === "asap" && <Badge tone="rust">{label(urgency, lang)}</Badge>}
           {cond && <Badge>{label(cond, lang)}</Badge>}
         </div>
@@ -2953,10 +3011,26 @@ function RequestDetail({ request, session, myShop, onBack, onOffer, onAccept, on
           <span className="flex items-center gap-1"><MapPin size={12} />{label(city, lang)}</span>
           <span className="flex items-center gap-1"><User size={12} />{t("requestFrom")}: {request.requesterName}</span>
         </div>
+        {request.status === "open" && daysLeft !== null && daysLeft <= 7 && (
+          <p className="text-xs mt-2 flex items-center gap-1" style={{ color: daysLeft <= 2 ? C.rust : C.steel }}>
+            <Clock size={11} />{daysLeft <= 0 ? t("expiresToday") : t("expiresInDays", { n: daysLeft })}
+          </p>
+        )}
       </div>
 
       {canOffer && request.status === "open" && (
         <PrimaryButton full icon={ShoppingCart} onClick={onOffer}>{t("submitOfferBtn")}</PrimaryButton>
+      )}
+
+      {canManage && (
+        <div className="flex gap-2 mt-3">
+          {request.status === "expired" && <PrimaryButton full icon={Rocket} onClick={onRenew}>{t("renewRequestBtn")}</PrimaryButton>}
+          <GhostButton full icon={X} onClick={onCancel} style={{ color: C.rust, borderColor: C.rustLight }}>{t("cancelRequestBtn")}</GhostButton>
+        </div>
+      )}
+
+      {isRequester && (
+        <GhostButton full icon={MessageCircle} onClick={onViewConversations} style={{ marginTop: 12 }}>{t("conversationsTitle")}</GhostButton>
       )}
 
       <div className="mt-5 flex items-center justify-between">
@@ -2981,8 +3055,8 @@ function RequestDetail({ request, session, myShop, onBack, onOffer, onAccept, on
                 {isRequester && request.status === "open" && (
                   <button onClick={() => onAccept(o.id)} className="text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1" style={{ background: C.greenLight, color: C.green }}><CheckCircle2 size={12} />{t("acceptOfferBtn")}</button>
                 )}
-                {isRequester && request.acceptedOfferId === o.id && (
-                  <button onClick={() => onContact(o.sellerContact)} className="text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1" style={{ background: C.amberLight, color: C.amberDark }}><Phone size={12} />{t("contactToArrange")}</button>
+                {isRequester && (
+                  <button onClick={() => onMessage(o.sellerId, o.sellerName)} className="text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1" style={{ background: C.amberLight, color: C.amberDark }}><MessageCircle size={12} />{t("messageBtn")}</button>
                 )}
               </div>
             </div>
@@ -3036,22 +3110,24 @@ function NewRequestModal({ onClose, onSubmit }) {
 // is implicitly the seller — the backend infers this) and by a seller
 // replying to a specific buyer's thread (otherPartyId is explicit, picked
 // from ListingConversationsModal below).
-function ListingMessageModal({ listingId, otherPartyId, otherPartyName, session, onClose }) {
+function ThreadMessageModal({ scope, scopeId, otherPartyId, otherPartyName, session, onClose }) {
   const { t } = useLang();
   const [thread, setThread] = useState([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
+  const getFn = scope === "request" ? messagesApi.getRequestMessages : messagesApi.getListingMessages;
+  const sendFn = scope === "request" ? messagesApi.sendRequestMessage : messagesApi.sendListingMessage;
 
   const refresh = useCallback(async () => {
     try {
-      const { messages } = await messagesApi.getListingMessages(listingId, otherPartyId, session.token);
+      const { messages } = await getFn(scopeId, otherPartyId, session.token);
       setThread(messages.map(mapApiMessage));
     } catch (e) {
       console.error("Could not load messages.", e);
     } finally {
       setLoading(false);
     }
-  }, [listingId, otherPartyId, session.token]);
+  }, [scopeId, otherPartyId, session.token]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -3060,7 +3136,7 @@ function ListingMessageModal({ listingId, otherPartyId, otherPartyName, session,
     const body = text.trim();
     setText("");
     try {
-      await messagesApi.sendListingMessage(listingId, body, otherPartyId, session.token);
+      await sendFn(scopeId, body, otherPartyId, session.token);
       await refresh();
     } catch (e) {
       alert(e.message);
@@ -3097,17 +3173,18 @@ function ListingMessageModal({ listingId, otherPartyId, otherPartyName, session,
   );
 }
 
-// Seller-only: which buyers have messaged about this listing, so they
-// have something to pick from before opening one specific thread above.
-function ListingConversationsModal({ listingId, session, onClose, onOpenThread }) {
+// Who has messaged about this listing/request, so there's something to
+// pick from before opening one specific thread above.
+function ThreadConversationsModal({ scope, scopeId, session, onClose, onOpenThread }) {
   const { t } = useLang();
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const getFn = scope === "request" ? messagesApi.getRequestConversations : messagesApi.getListingConversations;
 
   useEffect(() => {
     (async () => {
       try {
-        const { conversations: rows } = await messagesApi.getListingConversations(listingId, session.token);
+        const { conversations: rows } = await getFn(scopeId, session.token);
         setConversations(rows);
       } catch (e) {
         console.error("Could not load conversations.", e);
@@ -3115,7 +3192,7 @@ function ListingConversationsModal({ listingId, session, onClose, onOpenThread }
         setLoading(false);
       }
     })();
-  }, [listingId, session.token]);
+  }, [scopeId, session.token]);
 
   return (
     <Modal title={t("conversationsTitle")} onClose={onClose}>
@@ -3132,6 +3209,7 @@ function ListingConversationsModal({ listingId, session, onClose, onOpenThread }
                 <p dir="auto" className="text-xs mt-0.5 line-clamp-1" style={{ color: C.steel, unicodeBidi: "plaintext" }}>{c.last_body}</p>
               </div>
               <ChevronRight size={16} color={C.steel} />
+
             </button>
           ))}
         </div>
