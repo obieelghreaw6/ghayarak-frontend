@@ -6,7 +6,7 @@ import {
   Package, Users, DollarSign, X, ArrowLeft, ArrowRight, Wrench, Car, Zap,
   CircleDot, LogOut, Camera, Lightbulb, Wind, Gauge, Armchair,
   RectangleHorizontal, Cog, Settings2, Disc, Sparkles, BadgeCheck, AlertTriangle, Trash2,
-  Rocket, Building2, Eye, MessageCircle,
+  Rocket, Building2, Eye, EyeOff, MessageCircle,
   Languages, ShoppingCart, Truck, Bike, AlertOctagon, PackageCheck,
   CircleDollarSign, Flag, ChevronDown, Home, Filter as FilterIcon, Send, Bell, PackageSearch
 } from "lucide-react";
@@ -137,6 +137,9 @@ const T = {
     postTitleIndividual: "List a part",
     postTitleShop: "List a part (Shop)",
     titleField: "Title",
+    confirmDeleteListing: "Permanently delete this listing? This can't be undone.",
+    confirmDeleteShop: "Permanently delete this shop? This can't be undone.",
+    removeListingBtn: "Remove", deletePermanentlyBtn: "Delete permanently", shopDeletedToast: "Shop deleted.",
     statTotalUsers: "Total Users", statActiveOf: "{n} active", statTotalOf: "{n} total", statOpenRequests: "Open Requests",
     statGMV: "GMV", sectionMoney: "Money", statCommissionEarned: "Commission Earned", statCommissionOutstanding: "Outstanding",
     statCommissionCollected: "Collected", statAOV: "Avg Order Value", sectionSupply: "Supply", statVerifiedOf: "{n} verified", statIndividualSellers: "Individual Sellers",
@@ -536,6 +539,9 @@ const T = {
     postTitleIndividual: "أضف قطعة للبيع",
     postTitleShop: "أضف قطعة للبيع (محل)",
     titleField: "العنوان",
+    confirmDeleteListing: "حذف هذا الإعلان نهائيًا؟ لا يمكن التراجع عن هذا.",
+    confirmDeleteShop: "حذف هذا المحل نهائيًا؟ لا يمكن التراجع عن هذا.",
+    removeListingBtn: "إزالة", deletePermanentlyBtn: "حذف نهائي", shopDeletedToast: "تم حذف المحل.",
     statTotalUsers: "إجمالي المستخدمين", statActiveOf: "{n} نشط", statTotalOf: "{n} الإجمالي", statOpenRequests: "الطلبات المفتوحة",
     statGMV: "إجمالي قيمة المبيعات", sectionMoney: "الأموال", statCommissionEarned: "العمولة المكتسبة", statCommissionOutstanding: "المستحقة",
     statCommissionCollected: "المحصّلة", statAOV: "متوسط قيمة الطلب", sectionSupply: "العرض", statVerifiedOf: "{n} موثّق", statIndividualSellers: "بائعون أفراد",
@@ -1057,6 +1063,9 @@ const adsApi = {
 
 const adminApi = {
   getPendingListings: (token) => apiRequest("/admin/listings/pending", { headers: { Authorization: `Bearer ${token}` } }),
+  getAllListings: (token) => apiRequest("/admin/listings", { headers: { Authorization: `Bearer ${token}` } }),
+  deleteListing: (id, token) => apiRequest(`/admin/listings/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }),
+  deleteShop: (id, token) => apiRequest(`/admin/shops/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }),
   moderateListing: (id, decision, note, token) => apiRequest(`/admin/listings/${id}/moderate`, { method: "POST", body: JSON.stringify({ decision, note }), headers: { Authorization: `Bearer ${token}` } }),
   getSellers: (token) => apiRequest("/admin/sellers", { headers: { Authorization: `Bearer ${token}` } }),
   verifyShop: (id, token) => apiRequest(`/admin/shops/${id}/verify`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
@@ -1969,6 +1978,16 @@ function AppInner() {
       flash(e.message);
     }
   }
+  async function handleDeleteShop(shopId) {
+    if (!window.confirm(t("confirmDeleteShop"))) return;
+    try {
+      await adminApi.deleteShop(shopId, session.token);
+      setAdminShops(adminShops.filter((s) => s.id !== shopId));
+      flash(t("shopDeletedToast"));
+    } catch (e) {
+      flash(e.message);
+    }
+  }
 
   async function handleModerateListing(id, decision, note) {
     try {
@@ -2444,7 +2463,7 @@ function AppInner() {
             <AdminScreen listings={listings} revenue={revenue} session={session}
               pendingListings={pendingListings} onModerate={handleModerateListing}
               adminShops={adminShops} adminSettlements={adminSettlements} adminRefunds={adminRefunds} adminBankTransfers={adminBankTransfers}
-              onVerify={handleVerifyShop} onRemove={handleRemoveListing} onExit={() => setScreen("home")}
+              onVerify={handleVerifyShop} onRemove={handleRemoveListing} onDeleteShop={handleDeleteShop} onExit={() => setScreen("home")}
               onMarkCommissionSettled={handleMarkCommissionSettled}
               onUpdateRefundStatus={handleUpdateRefundStatus}
               onVerifyBankConfirmation={handleVerifyBankConfirmation} />
@@ -4527,7 +4546,7 @@ function BoostModal({ onClose, onBoost }) {
 /* ---------------------------------------------------------------------
    ADMIN / OWNER DASHBOARD
 --------------------------------------------------------------------- */
-function AdminScreen({ listings, revenue, session, pendingListings, adminShops, adminSettlements, adminRefunds, adminBankTransfers, onModerate, onVerify, onRemove, onExit, onMarkCommissionSettled, onUpdateRefundStatus, onVerifyBankConfirmation }) {
+function AdminScreen({ listings, revenue, session, pendingListings, adminShops, adminSettlements, adminRefunds, adminBankTransfers, onModerate, onVerify, onRemove, onDeleteShop, onExit, onMarkCommissionSettled, onUpdateRefundStatus, onVerifyBankConfirmation }) {
   const { t, lang } = useLang();
   const [tab, setTab] = useState("overview");
   const activeListings = listings.filter((l) => l.status === "active");
@@ -4538,15 +4557,18 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
   // faked while waiting.
   const [overview, setOverview] = useState(null);
   const [health, setHealth] = useState(null);
+  const [overviewError, setOverviewError] = useState(null);
   useEffect(() => {
     if (tab !== "overview") return;
     (async () => {
       try {
+        setOverviewError(null);
         const [ov, hl] = await Promise.all([adminApi.getOverview(session.token), adminApi.getHealth(session.token)]);
         setOverview(ov);
         setHealth(hl);
       } catch (e) {
         console.error("Could not load overview.", e);
+        setOverviewError(e.message);
       }
     })();
   }, [tab, session.token]);
@@ -4563,6 +4585,33 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
       }
     })();
   }, [tab, revenueDays, session.token]);
+
+  // Every listing regardless of status — the general `listings` prop is
+  // the public, active-only feed, which meant this tab previously had no
+  // way to even see (let alone manage) anything pending, rejected, sold,
+  // or already removed.
+  const [allListings, setAllListings] = useState([]);
+  useEffect(() => {
+    if (tab !== "listings") return;
+    (async () => {
+      try {
+        const { listings: rows } = await adminApi.getAllListings(session.token);
+        setAllListings(rows.map(mapApiListing));
+      } catch (e) {
+        console.error("Could not load listings.", e);
+      }
+    })();
+  }, [tab, session.token]);
+
+  async function handleDeleteListing(id) {
+    if (!window.confirm(t("confirmDeleteListing"))) return;
+    try {
+      await adminApi.deleteListing(id, session.token);
+      setAllListings((prev) => prev.filter((l) => l.id !== id));
+    } catch (e) {
+      alert(e.message);
+    }
+  }
 
   return (
     <div style={{ background: C.sandLight, minHeight: "100vh" }}>
@@ -4600,7 +4649,9 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
           )
         )}
         {tab === "overview" && (
-          !overview ? (
+          overviewError ? (
+            <p className="text-sm py-10 text-center" style={{ color: C.rust }}>{overviewError}</p>
+          ) : !overview ? (
             <p className="text-sm py-10 text-center" style={{ color: C.steel }}>{t("loading")}</p>
           ) : (
             <>
@@ -4729,17 +4780,24 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
           </>
         )}
         {tab === "listings" && (
-          <div className="space-y-2">
-            {listings.map((l) => (
-              <div key={l.id} className="p-3 rounded-xl border flex items-center justify-between" style={{ background: "#fff", borderColor: C.line }}>
-                <div className="min-w-0">
-                  <p dir="auto" className="text-sm font-semibold truncate" style={{ color: C.asphalt, unicodeBidi: "plaintext" }}>{l.title}</p>
-                  <p className="text-xs flex items-center gap-2 mt-0.5" style={{ color: C.steel }}><span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{l.id}</span> · {label(findCity(l.city), lang)} · <Badge tone={l.status === "active" ? "green" : l.status === "sold" ? "rust" : "neutral"}>{t("status" + l.status.charAt(0).toUpperCase() + l.status.slice(1))}</Badge></p>
+          allListings.length === 0 ? (
+            <p className="text-sm py-10 text-center" style={{ color: C.steel }}>{t("loading")}</p>
+          ) : (
+            <div className="space-y-2">
+              {allListings.map((l) => (
+                <div key={l.id} className="p-3 rounded-xl border flex items-center justify-between" style={{ background: "#fff", borderColor: C.line }}>
+                  <div className="min-w-0">
+                    <p dir="auto" className="text-sm font-semibold truncate" style={{ color: C.asphalt, unicodeBidi: "plaintext" }}>{l.title}</p>
+                    <p className="text-xs flex items-center gap-2 mt-0.5" style={{ color: C.steel }}><span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{l.id}</span> · {label(findCity(l.city), lang)} · <Badge tone={l.status === "active" ? "green" : l.status === "sold" ? "rust" : "neutral"}>{t("status" + l.status.charAt(0).toUpperCase() + l.status.slice(1))}</Badge></p>
+                  </div>
+                  <div className="flex gap-1.5 flex-shrink-0">
+                    {l.status === "active" && <button onClick={() => onRemove(l.id)} className="p-2 rounded-lg" style={{ background: C.amberLight }} title={t("removeListingBtn")}><EyeOff size={14} color={C.amberDark} /></button>}
+                    <button onClick={() => handleDeleteListing(l.id)} className="p-2 rounded-lg" style={{ background: C.rustLight }} title={t("deletePermanentlyBtn")}><Trash2 size={14} color={C.rust} /></button>
+                  </div>
                 </div>
-                {l.status === "active" && <button onClick={() => onRemove(l.id)} className="p-2 rounded-lg flex-shrink-0" style={{ background: C.rustLight }}><Trash2 size={14} color={C.rust} /></button>}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )
         )}
         {tab === "shops" && (
           adminShops.length === 0 ? (
@@ -4753,7 +4811,10 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
                     <Badge tone="amber">{lang === "ar" ? FEES.tiers[s.tier].nameAr : FEES.tiers[s.tier].name}</Badge>
                   </div>
                   <p className="text-xs mt-1" style={{ color: C.steel }}>{s.ownerName} · {label(findCity(s.city), lang)} · {s.listingCount} {t("listingsCount")} · <Badge tone={s.status === "approved" ? "green" : "amber"}>{s.status}</Badge></p>
-                  {s.status !== "approved" && <button onClick={() => onVerify(s.id)} className="mt-2 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.greenLight, color: C.green }}>{t("verifyShop")}</button>}
+                  <div className="flex gap-1.5 mt-2">
+                    {s.status !== "approved" && <button onClick={() => onVerify(s.id)} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.greenLight, color: C.green }}>{t("verifyShop")}</button>}
+                    <button onClick={() => onDeleteShop(s.id)} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.rustLight, color: C.rust }}>{t("deletePermanentlyBtn")}</button>
+                  </div>
                 </div>
               ))}
             </div>
