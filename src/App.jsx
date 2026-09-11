@@ -7,7 +7,7 @@ import {
   CircleDot, LogOut, Camera, Lightbulb, Wind, Gauge, Armchair,
   RectangleHorizontal, Cog, Settings2, Disc, Sparkles, BadgeCheck, AlertTriangle, Trash2,
   Rocket, Building2, Eye, EyeOff, MessageCircle,
-  Languages, ShoppingCart, Truck, Bike, AlertOctagon, PackageCheck,
+  Languages, ShoppingCart, Truck, Bike, AlertOctagon, PackageCheck, Info,
   CircleDollarSign, Flag, ChevronDown, Home, Filter as FilterIcon, Send, Bell, PackageSearch
 } from "lucide-react";
 import {
@@ -104,7 +104,7 @@ const T = {
     noMatchTitle: "No parts match yet",
     noMatchSub: "Try another category, city, or search term.",
     back: "Back",
-    cancel: "Cancel", confirmTitle: "Are you sure?", listingDeletedToast: "Listing deleted.",
+    cancel: "Cancel", close: "Close", confirmTitle: "Are you sure?", listingDeletedToast: "Listing deleted.",
     descriptionLabel: "DESCRIPTION",
     views: "views", daysAgo: "d ago",
     markAsSold: "Mark as sold",
@@ -138,6 +138,12 @@ const T = {
     postTitleIndividual: "List a part",
     postTitleShop: "List a part (Shop)",
     titleField: "Title",
+    reserveAtShopExplainer: "Pay cash in person. You'll get a code to show at the shop when you pick it up.",
+    reservePartBtn: "Reserve Part", reservationRedeemedLabel: "Picked up and paid",
+    showThisCodeAtShop: "Show this code at the shop", waitingForCodeRedemption: "Waiting for the customer to arrive",
+    enterCodeToRedeem: "Customer's reservation code", redeemCodeBtn: "Confirm & Complete",
+    codeRedeemedToast: "Reservation completed.", redeemCodeModalTitle: "Redeem a Reservation",
+    lookUpCodeBtn: "Look Up", redeemCodePrompt: "Redeem a customer's reservation code",
     confirmDeleteListing: "Permanently delete this listing? This can't be undone.",
     confirmDeleteShop: "Permanently delete this shop? This can't be undone.",
     removeListingBtn: "Remove", deletePermanentlyBtn: "Delete permanently", shopDeletedToast: "Shop deleted.",
@@ -507,7 +513,7 @@ const T = {
     noMatchTitle: "لا توجد قطع مطابقة بعد",
     noMatchSub: "جرّب قسمًا آخر، مدينة أخرى، أو كلمة بحث مختلفة.",
     back: "رجوع",
-    cancel: "إلغاء", confirmTitle: "هل أنت متأكد؟", listingDeletedToast: "تم حذف الإعلان.",
+    cancel: "إلغاء", close: "إغلاق", confirmTitle: "هل أنت متأكد؟", listingDeletedToast: "تم حذف الإعلان.",
     descriptionLabel: "الوصف",
     views: "مشاهدة", daysAgo: "يوم مضى",
     markAsSold: "تحديد كمُباع",
@@ -541,6 +547,12 @@ const T = {
     postTitleIndividual: "أضف قطعة للبيع",
     postTitleShop: "أضف قطعة للبيع (محل)",
     titleField: "العنوان",
+    reserveAtShopExplainer: "ادفع نقدًا شخصيًا. ستحصل على رمز تُظهره في المحل عند الاستلام.",
+    reservePartBtn: "احجز القطعة", reservationRedeemedLabel: "تم الاستلام والدفع",
+    showThisCodeAtShop: "أظهر هذا الرمز في المحل", waitingForCodeRedemption: "بانتظار وصول الزبون",
+    enterCodeToRedeem: "رمز حجز الزبون", redeemCodeBtn: "تأكيد وإتمام",
+    codeRedeemedToast: "تم إتمام الحجز.", redeemCodeModalTitle: "استلام حجز",
+    lookUpCodeBtn: "بحث", redeemCodePrompt: "استلام حجز بواسطة رمز الزبون",
     confirmDeleteListing: "حذف هذا الإعلان نهائيًا؟ لا يمكن التراجع عن هذا.",
     confirmDeleteShop: "حذف هذا المحل نهائيًا؟ لا يمكن التراجع عن هذا.",
     removeListingBtn: "إزالة", deletePermanentlyBtn: "حذف نهائي", shopDeletedToast: "تم حذف المحل.",
@@ -1096,6 +1108,8 @@ const ordersApi = {
   dispute: (id, reason, description, token) => apiRequest(`/orders/${id}/dispute`, { method: "POST", body: JSON.stringify({ reason, description }), headers: { Authorization: `Bearer ${token}` } }),
   submitBankConfirmation: (id, referenceText, token) => apiRequest(`/orders/${id}/bank-transfer-confirmation`, { method: "POST", body: JSON.stringify({ referenceText }), headers: { Authorization: `Bearer ${token}` } }),
   requestRefund: (id, amount, reason, token) => apiRequest(`/orders/${id}/refund-request`, { method: "POST", body: JSON.stringify({ amount, reason }), headers: { Authorization: `Bearer ${token}` } }),
+  redeemCode: (id, code, token) => apiRequest(`/orders/${id}/redeem-code`, { method: "POST", body: JSON.stringify({ code }), headers: { Authorization: `Bearer ${token}` } }),
+  lookupByCode: (code, token) => apiRequest(`/orders/lookup-by-code/${encodeURIComponent(code)}`, { headers: { Authorization: `Bearer ${token}` } }),
 };
 
 const shopsApi = {
@@ -1261,6 +1275,7 @@ function mapApiOrder(o, extras = {}) {
     paymentMethod: o.payment_method,
     paymentCategory: o.payment_category,
     paymentMethodDetail: o.payment_method_detail,
+    reservationCode: o.reservation_code,
     deliveryMethod: o.delivery_method,
     deliveryAddress: o.delivery_address,
     deliveryNotes: o.delivery_notes,
@@ -1338,6 +1353,7 @@ const FEES = {
 };
 const PAYMENT_METHODS = [
   { id: "cash", en: "Cash on delivery", ar: "الدفع عند الاستلام", icon: "💵" },
+  { id: "reserve_at_shop", en: "Reserve & Pay at Shop", ar: "احجز وادفع في المحل", icon: "🎫" },
   { id: "lypay", en: "LYPAY / ONEPAY", ar: "LYPAY / ONEPAY", icon: "📱" },
   { id: "card", en: "Local card", ar: "بطاقة محلية", icon: "💳" },
   { id: "bank", en: "Bank / instant transfer", ar: "تحويل بنكي / فوري", icon: "🏦" },
@@ -1575,6 +1591,7 @@ function AppInner() {
   const [activeOrder, setActiveOrder] = useState(null);
   const [activeShopId, setActiveShopId] = useState(null);
   const [showThreadMessage, setShowThreadMessage] = useState(null);
+  const [showRedeemCode, setShowRedeemCode] = useState(false);
   const [showThreadConversations, setShowThreadConversations] = useState(null);
   const [activeShop, setActiveShop] = useState(null);
   const [editingListing, setEditingListing] = useState(null);
@@ -1981,13 +1998,8 @@ function AppInner() {
     }
   }
   async function handleDeleteShop(shopId) {
-    try {
-      await adminApi.deleteShop(shopId, session.token);
-      setAdminShops(adminShops.filter((s) => s.id !== shopId));
-      flash(t("shopDeletedToast"));
-    } catch (e) {
-      flash(e.message);
-    }
+    await adminApi.deleteShop(shopId, session.token);
+    setAdminShops(adminShops.filter((s) => s.id !== shopId));
   }
 
   async function handleModerateListing(id, decision, note) {
@@ -2211,6 +2223,15 @@ function AppInner() {
     try { await ordersApi.confirm(orderId, session.token); await refreshOrder(orderId); flash(t("orderCompletedToast")); }
     catch (e) { flash(e.message); }
   }
+  async function handleRedeemCode(orderId, code) {
+    try {
+      await ordersApi.redeemCode(orderId, code, session.token);
+      await refreshOrder(orderId);
+      flash(t("codeRedeemedToast"));
+    } catch (e) {
+      flash(e.message);
+    }
+  }
   // Buyer cancels (only while pending) or seller declines/cancels (while
   // pending, accepted, or preparing). If the order had reserved the
   // listing, the backend releases it back to active automatically.
@@ -2400,6 +2421,7 @@ function AppInner() {
               onRemove={handleRemoveListing}
               onBoost={(id) => setShowBoost(id)}
               onOpenRequest={handleOpenRequest}
+              onOpenRedeemCode={() => setShowRedeemCode(true)}
               onBack={() => setScreen("account")} />
           )}
           {screen === "listing" && activeListing && (
@@ -2442,7 +2464,8 @@ function AppInner() {
               onCancel={(actor) => handleCancelOrder(activeOrder.id, actor)}
               onSendMessage={(body) => handleSendMessage(activeOrder.id, body)}
               onRequestRefund={() => setShowRefundRequest(activeOrder.id)}
-              onSubmitBankConfirmation={(ref) => handleSubmitBankConfirmation(activeOrder.id, ref)} />
+              onSubmitBankConfirmation={(ref) => handleSubmitBankConfirmation(activeOrder.id, ref)}
+              onRedeemCode={handleRedeemCode} />
           )}
           {screen === "account" && (
             <AccountScreen session={session} myShop={myShop} listings={myListingsAll}
@@ -2461,7 +2484,7 @@ function AppInner() {
               onGoSellerCenter={() => setScreen("seller")} />
           )}
           {screen === "admin" && ["admin", "owner", "moderator"].includes(session?.role) && (
-            <AdminScreen listings={listings} revenue={revenue} session={session} flash={flash}
+            <AdminScreen listings={listings} revenue={revenue} session={session}
               pendingListings={pendingListings} onModerate={handleModerateListing}
               adminShops={adminShops} adminSettlements={adminSettlements} adminRefunds={adminRefunds} adminBankTransfers={adminBankTransfers}
               onVerify={handleVerifyShop} onRemove={handleRemoveListing} onDeleteShop={handleDeleteShop} onExit={() => setScreen("home")}
@@ -2493,6 +2516,9 @@ function AppInner() {
         {showNewRequest && session && <NewRequestModal onClose={() => setShowNewRequest(false)} onSubmit={handleCreateRequest} />}
         {showOffer && session && <OfferModal onClose={() => setShowOffer(null)} onSubmit={(form) => handleSubmitOffer(showOffer, form)} />}
         {showBuy && session && <BuyModal listing={showBuy} onClose={() => setShowBuy(null)} onSubmit={(form) => handleCreateOrder(showBuy, form)} />}
+        {showRedeemCode && session && (
+          <RedeemCodeModal session={session} onClose={() => setShowRedeemCode(false)} onRedeemed={() => flash(t("codeRedeemedToast"))} />
+        )}
         {showThreadMessage && session && (
           <ThreadMessageModal scope={showThreadMessage.scope} scopeId={showThreadMessage.scopeId} otherPartyId={showThreadMessage.otherPartyId} otherPartyName={showThreadMessage.otherPartyName} session={session} onClose={() => setShowThreadMessage(null)} />
         )}
@@ -3346,6 +3372,116 @@ function ThreadMessageModal({ scope, scopeId, otherPartyId, otherPartyName, sess
 
 // Who has messaged about this listing/request, so there's something to
 // pick from before opening one specific thread above.
+// A confirmation that shows what actually happened, unmissably, instead
+// of closing immediately and relying on a separate toast the person
+// might not notice — stays open through loading, then a clear success or
+// error message, until they dismiss it themselves.
+// Lets a seller find a Reserve & Pay at Shop order just from the code a
+// customer shows them in person, without already knowing which order it
+// is — lookup first (shows what they'd be redeeming, so they can
+// confirm it's the right customer/part before committing), then redeem.
+function RedeemCodeModal({ session, onClose, onRedeemed }) {
+  const { t, lang } = useLang();
+  const [codeInput, setCodeInput] = useState("");
+  const [found, setFound] = useState(null);
+  const [state, setState] = useState("idle"); // idle | looking | found | redeeming | done | error
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function lookup() {
+    setState("looking");
+    setErrorMsg("");
+    try {
+      const { order } = await ordersApi.lookupByCode(codeInput.trim(), session.token);
+      setFound(mapApiOrder(order));
+      setState("found");
+    } catch (e) {
+      setErrorMsg(e.message);
+      setState("error");
+    }
+  }
+
+  async function redeem() {
+    setState("redeeming");
+    try {
+      await ordersApi.redeemCode(found.id, codeInput.trim(), session.token);
+      setState("done");
+      onRedeemed?.();
+    } catch (e) {
+      setErrorMsg(e.message);
+      setState("error");
+    }
+  }
+
+  return (
+    <Modal title={t("redeemCodeModalTitle")} onClose={onClose}>
+      {(state === "idle" || state === "looking" || state === "error") && (
+        <>
+          <input dir="auto" value={codeInput} onChange={(e) => setCodeInput(e.target.value.toUpperCase())} placeholder="GHY-XXXXXX" style={{ ...inputStyle, marginBottom: 8, fontFamily: "'IBM Plex Mono', monospace", textAlign: "center", letterSpacing: 1 }} onKeyDown={(e) => { if (e.key === "Enter" && codeInput.trim()) lookup(); }} />
+          {errorMsg && <p className="text-xs mb-3" style={{ color: C.rust }}>{errorMsg}</p>}
+          <PrimaryButton full disabled={!codeInput.trim() || state === "looking"} onClick={lookup}>{state === "looking" ? t("loading") : t("lookUpCodeBtn")}</PrimaryButton>
+        </>
+      )}
+      {(state === "found" || state === "redeeming") && found && (
+        <>
+          <div className="p-3 rounded-xl mb-3" style={{ background: C.sand }}>
+            <p dir="auto" className="text-sm font-semibold" style={{ color: C.asphalt, unicodeBidi: "plaintext" }}>{found.listingTitle}</p>
+            <p className="text-xs mt-1" style={{ color: C.steel }}>{found.buyerName} · <PriceTag amount={found.partPrice} /></p>
+          </div>
+          <PrimaryButton full disabled={state === "redeeming"} onClick={redeem}>{state === "redeeming" ? t("loading") : t("redeemCodeBtn")}</PrimaryButton>
+        </>
+      )}
+      {state === "done" && (
+        <>
+          <p className="text-sm mb-4 flex items-center gap-2" style={{ color: C.green }}><CheckCircle2 size={16} />{t("codeRedeemedToast")}</p>
+          <PrimaryButton full onClick={onClose}>{t("close")}</PrimaryButton>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+function ConfirmActionModal({ message, run, onClose }) {
+  const { t } = useLang();
+  const [state, setState] = useState("idle"); // idle | loading | done | error
+  const [resultMessage, setResultMessage] = useState("");
+
+  async function handleConfirm() {
+    setState("loading");
+    try {
+      const msg = await run();
+      setResultMessage(msg);
+      setState("done");
+    } catch (e) {
+      setResultMessage(e.message);
+      setState("error");
+    }
+  }
+
+  return (
+    <Modal title={t("confirmTitle")} onClose={onClose}>
+      {state === "idle" && (
+        <>
+          <p className="text-sm mb-4" style={{ color: C.asphalt }}>{message}</p>
+          <div className="flex gap-2">
+            <GhostButton full onClick={onClose}>{t("cancel")}</GhostButton>
+            <PrimaryButton full onClick={handleConfirm} style={{ background: C.rust }}>{t("deletePermanentlyBtn")}</PrimaryButton>
+          </div>
+        </>
+      )}
+      {state === "loading" && <p className="text-sm text-center py-4" style={{ color: C.steel }}>{t("loading")}</p>}
+      {(state === "done" || state === "error") && (
+        <>
+          <p className="text-sm mb-4 flex items-center gap-2" style={{ color: state === "done" ? C.green : C.rust }}>
+            {state === "done" ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+            {resultMessage}
+          </p>
+          <PrimaryButton full onClick={onClose}>{t("close")}</PrimaryButton>
+        </>
+      )}
+    </Modal>
+  );
+}
+
 function ThreadConversationsModal({ scope, scopeId, session, onClose, onOpenThread }) {
   const { t } = useLang();
   const [conversations, setConversations] = useState([]);
@@ -3420,7 +3556,14 @@ function BuyModal({ listing, onClose, onSubmit }) {
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [includeProtection, setIncludeProtection] = useState(!!listing.protectedDeal);
 
-  const paymentCategory = paymentMethod === "cash" ? "cash" : "electronic";
+  // Reserve & Pay at Shop only makes sense for pickup — there's no
+  // "reserve it, then have it delivered" version of this flow.
+  function selectPaymentMethod(id) {
+    setPaymentMethod(id);
+    if (id === "reserve_at_shop") setDeliveryMethod("pickup");
+  }
+
+  const paymentCategory = paymentMethod === "cash" || paymentMethod === "reserve_at_shop" ? "cash" : "electronic";
   const canSubmit = (paymentMethod !== "other" || otherPaymentDetail.trim().length > 0) && (deliveryMethod !== "delivery" || deliveryAddress.trim().length > 0);
   const deliveryFee = deliveryMethod === "delivery" ? FEES.deliveryFlat : 0;
   const protectionFee = includeProtection ? Math.round(listing.price * FEES.protectionPct) : 0;
@@ -3432,18 +3575,20 @@ function BuyModal({ listing, onClose, onSubmit }) {
     <Modal title={t("buyModalTitle")} onClose={onClose} wide>
       <p dir="auto" className="text-sm font-semibold mb-3" style={{ color: C.asphalt, unicodeBidi: "plaintext" }}>{listing.title}</p>
 
-      <Field label={t("deliveryMethodLabel")}>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => setDeliveryMethod("pickup")} className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg border text-sm font-semibold" style={{ borderColor: deliveryMethod === "pickup" ? C.amber : C.line, background: deliveryMethod === "pickup" ? C.amberLight : "#fff", color: deliveryMethod === "pickup" ? C.amberDark : C.asphalt }}>
-            <User size={14} />{t("pickupOption")}
-          </button>
-          <button type="button" onClick={() => setDeliveryMethod("delivery")} className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg border text-sm font-semibold" style={{ borderColor: deliveryMethod === "delivery" ? C.amber : C.line, background: deliveryMethod === "delivery" ? C.amberLight : "#fff", color: deliveryMethod === "delivery" ? C.amberDark : C.asphalt }}>
-            <Truck size={14} />{t("deliveryOption")}
-          </button>
-        </div>
-      </Field>
+      {paymentMethod !== "reserve_at_shop" && (
+        <Field label={t("deliveryMethodLabel")}>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => setDeliveryMethod("pickup")} className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg border text-sm font-semibold" style={{ borderColor: deliveryMethod === "pickup" ? C.amber : C.line, background: deliveryMethod === "pickup" ? C.amberLight : "#fff", color: deliveryMethod === "pickup" ? C.amberDark : C.asphalt }}>
+              <User size={14} />{t("pickupOption")}
+            </button>
+            <button type="button" onClick={() => setDeliveryMethod("delivery")} className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg border text-sm font-semibold" style={{ borderColor: deliveryMethod === "delivery" ? C.amber : C.line, background: deliveryMethod === "delivery" ? C.amberLight : "#fff", color: deliveryMethod === "delivery" ? C.amberDark : C.asphalt }}>
+              <Truck size={14} />{t("deliveryOption")}
+            </button>
+          </div>
+        </Field>
+      )}
 
-      {deliveryMethod === "delivery" && (
+      {deliveryMethod === "delivery" && paymentMethod !== "reserve_at_shop" && (
         <>
           <Field label={t("deliveryAddressField")}><input style={inputStyle} value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} placeholder={t("deliveryAddressPlaceholder")} /></Field>
           <Field label={t("deliveryNotesField")}><input style={inputStyle} value={deliveryNotes} onChange={(e) => setDeliveryNotes(e.target.value)} placeholder={t("deliveryNotesPlaceholder")} /></Field>
@@ -3453,12 +3598,19 @@ function BuyModal({ listing, onClose, onSubmit }) {
       <Field label={t("paymentMethodLabel")}>
         <div className="space-y-2">
           {PAYMENT_METHODS.map((p) => (
-            <button key={p.id} type="button" onClick={() => setPaymentMethod(p.id)} className="w-full flex items-center gap-2 p-2.5 rounded-lg border text-sm font-semibold" style={{ borderColor: paymentMethod === p.id ? C.amber : C.line, background: paymentMethod === p.id ? C.amberLight : "#fff", color: paymentMethod === p.id ? C.amberDark : C.asphalt }}>
+            <button key={p.id} type="button" onClick={() => selectPaymentMethod(p.id)} className="w-full flex items-center gap-2 p-2.5 rounded-lg border text-sm font-semibold" style={{ borderColor: paymentMethod === p.id ? C.amber : C.line, background: paymentMethod === p.id ? C.amberLight : "#fff", color: paymentMethod === p.id ? C.amberDark : C.asphalt }}>
               <span>{p.icon}</span>{label(p, lang)}
             </button>
           ))}
         </div>
       </Field>
+
+      {paymentMethod === "reserve_at_shop" && (
+        <p className="text-xs mb-4 p-2.5 rounded-lg flex items-start gap-1.5" style={{ background: C.amberLight, color: C.amberDark }}>
+          <Info size={13} className="mt-0.5 flex-shrink-0" />
+          {t("reserveAtShopExplainer")}
+        </p>
+      )}
 
       {paymentMethod === "other" && (
         <Field label={t("otherPaymentDetailField")}>
@@ -3485,7 +3637,7 @@ function BuyModal({ listing, onClose, onSubmit }) {
         {t("sellerCommissionNote", { pct: Math.round(FEES.commissionPct * 100) })} ({commission.toLocaleString()} {cur})
       </p>
 
-      <PrimaryButton full disabled={!canSubmit} icon={ShoppingCart} onClick={() => onSubmit({ paymentMethod, paymentCategory, otherPaymentDetail: paymentMethod === "other" ? otherPaymentDetail.trim() : null, deliveryMethod, deliveryAddress: deliveryMethod === "delivery" ? deliveryAddress.trim() : null, deliveryNotes: deliveryMethod === "delivery" ? deliveryNotes.trim() : null, includeProtection })}>{t("placeOrderBtn")}</PrimaryButton>
+      <PrimaryButton full disabled={!canSubmit} icon={paymentMethod === "reserve_at_shop" ? Rocket : ShoppingCart} onClick={() => onSubmit({ paymentMethod, paymentCategory, otherPaymentDetail: paymentMethod === "other" ? otherPaymentDetail.trim() : null, deliveryMethod: paymentMethod === "reserve_at_shop" ? "pickup" : deliveryMethod, deliveryAddress: deliveryMethod === "delivery" ? deliveryAddress.trim() : null, deliveryNotes: deliveryMethod === "delivery" ? deliveryNotes.trim() : null, includeProtection })}>{paymentMethod === "reserve_at_shop" ? t("reservePartBtn") : t("placeOrderBtn")}</PrimaryButton>
     </Modal>
   );
 }
@@ -3510,7 +3662,7 @@ function OrderCard({ order, session, onOpen }) {
   );
 }
 
-function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, onDispatch, onFulfil, onConfirmReceipt, onDispute, onCancel, onSendMessage, onRequestRefund, onSubmitBankConfirmation }) {
+function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, onDispatch, onFulfil, onConfirmReceipt, onDispute, onCancel, onSendMessage, onRequestRefund, onSubmitBankConfirmation, onRedeemCode }) {
   const { t, lang, dir } = useLang();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   const isBuyer = session?.id === order.buyerId;
@@ -3521,6 +3673,7 @@ function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, on
   const pm = findPaymentMethod(order.paymentMethod);
   const [msgText, setMsgText] = useState("");
   const [bankRef, setBankRef] = useState("");
+  const [redeemInput, setRedeemInput] = useState("");
   const readyStatus = isPickup ? "ready_for_pickup" : "out_for_delivery";
   const fulfilledStatus = isPickup ? "collected" : "delivered";
   const statusTone = order.status === "completed" ? "green" : ["disputed", "cancelled"].includes(order.status) ? "rust" : "amber";
@@ -3542,6 +3695,15 @@ function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, on
           <div className="flex items-center justify-between text-sm"><span style={{ color: C.steel }}>{t("paymentMethodShown")}</span><span style={{ color: C.asphalt }}>{pm.icon} {label(pm, lang)}</span></div>
           <div className="flex items-center justify-between text-sm"><span style={{ color: C.steel }}>{t("deliveryMethodShown")}</span><span style={{ color: C.asphalt }}>{order.deliveryMethod === "delivery" ? t("deliveryOption") : t("pickupOption")}</span></div>
         </div>
+
+        {order.paymentMethod === "reserve_at_shop" && order.reservationCode && (
+          <div className="mt-3 p-4 rounded-xl text-center" style={{ background: order.status === "completed" ? C.greenLight : C.amberLight }}>
+            <p className="text-xs font-semibold mb-1.5" style={{ color: order.status === "completed" ? C.green : C.amberDark }}>
+              {order.status === "completed" ? t("reservationRedeemedLabel") : isBuyer ? t("showThisCodeAtShop") : t("waitingForCodeRedemption")}
+            </p>
+            <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 28, fontWeight: 700, letterSpacing: 2, color: C.asphalt }}>{order.reservationCode}</p>
+          </div>
+        )}
 
         {order.deliveryMethod === "delivery" && order.deliveryAddress && (
           <div className="mt-3 p-3 rounded-xl" style={{ background: C.sand }}>
@@ -3576,21 +3738,31 @@ function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, on
       )}
 
       <div className="mt-4 flex flex-col gap-2">
-        {isSeller && order.status === "pending" && <PrimaryButton full icon={CheckCircle2} onClick={onAccept}>{t("acceptOrderBtn")}</PrimaryButton>}
-        {isSeller && order.status === "pending" && <GhostButton full icon={X} onClick={() => onCancel("seller")} style={{ color: C.rust, borderColor: C.rustLight }}>{t("rejectOrderBtn")}</GhostButton>}
-        {isBuyer && order.status === "pending" && <GhostButton full icon={X} onClick={() => onCancel("buyer")} style={{ color: C.rust, borderColor: C.rustLight }}>{t("cancelOrderBtn")}</GhostButton>}
-
-        {isSeller && order.status === "accepted" && <PrimaryButton full icon={PackageCheck} onClick={onPrepare}>{t("prepareOrderBtn")}</PrimaryButton>}
-        {isSeller && ["accepted", "preparing"].includes(order.status) && <GhostButton full icon={X} onClick={() => onCancel("seller")} style={{ color: C.rust, borderColor: C.rustLight }}>{t("cancelOrderBtn")}</GhostButton>}
-
-        {isSeller && order.status === "preparing" && <PrimaryButton full icon={Truck} onClick={onDispatch}>{t(isPickup ? "dispatchBtnPickup" : "dispatchBtnDelivery")}</PrimaryButton>}
-
-        {isSeller && order.status === readyStatus && <PrimaryButton full icon={PackageCheck} onClick={onFulfil}>{t(isPickup ? "fulfilBtnPickup" : "fulfilBtnDelivery")}</PrimaryButton>}
-
-        {isBuyer && order.status === fulfilledStatus && (
+        {isSeller && order.paymentMethod === "reserve_at_shop" && ["pending", "accepted"].includes(order.status) ? (
+          <div className="p-3 rounded-xl border" style={{ borderColor: C.line, background: "#fff" }}>
+            <p className="text-xs font-semibold mb-2" style={{ color: C.steel }}>{t("enterCodeToRedeem")}</p>
+            <input dir="auto" value={redeemInput} onChange={(e) => setRedeemInput(e.target.value.toUpperCase())} placeholder="GHY-XXXXXX" style={{ ...inputStyle, marginBottom: 8, fontFamily: "'IBM Plex Mono', monospace", textAlign: "center", letterSpacing: 1 }} />
+            <PrimaryButton full disabled={!redeemInput.trim()} onClick={() => onRedeemCode(order.id, redeemInput.trim())}>{t("redeemCodeBtn")}</PrimaryButton>
+          </div>
+        ) : (
           <>
-            <PrimaryButton full icon={CheckCircle2} onClick={onConfirmReceipt}>{t("confirmReceiptBtn")}</PrimaryButton>
-            <GhostButton full icon={Flag} onClick={onDispute} style={{ color: C.rust, borderColor: C.rustLight }}>{t("reportProblemBtn")}</GhostButton>
+            {isSeller && order.status === "pending" && <PrimaryButton full icon={CheckCircle2} onClick={onAccept}>{t("acceptOrderBtn")}</PrimaryButton>}
+            {isSeller && order.status === "pending" && <GhostButton full icon={X} onClick={() => onCancel("seller")} style={{ color: C.rust, borderColor: C.rustLight }}>{t("rejectOrderBtn")}</GhostButton>}
+            {isBuyer && order.status === "pending" && <GhostButton full icon={X} onClick={() => onCancel("buyer")} style={{ color: C.rust, borderColor: C.rustLight }}>{t("cancelOrderBtn")}</GhostButton>}
+
+            {isSeller && order.status === "accepted" && <PrimaryButton full icon={PackageCheck} onClick={onPrepare}>{t("prepareOrderBtn")}</PrimaryButton>}
+            {isSeller && ["accepted", "preparing"].includes(order.status) && <GhostButton full icon={X} onClick={() => onCancel("seller")} style={{ color: C.rust, borderColor: C.rustLight }}>{t("cancelOrderBtn")}</GhostButton>}
+
+            {isSeller && order.status === "preparing" && <PrimaryButton full icon={Truck} onClick={onDispatch}>{t(isPickup ? "dispatchBtnPickup" : "dispatchBtnDelivery")}</PrimaryButton>}
+
+            {isSeller && order.status === readyStatus && <PrimaryButton full icon={PackageCheck} onClick={onFulfil}>{t(isPickup ? "fulfilBtnPickup" : "fulfilBtnDelivery")}</PrimaryButton>}
+
+            {isBuyer && order.status === fulfilledStatus && (
+              <>
+                <PrimaryButton full icon={CheckCircle2} onClick={onConfirmReceipt}>{t("confirmReceiptBtn")}</PrimaryButton>
+                <GhostButton full icon={Flag} onClick={onDispute} style={{ color: C.rust, borderColor: C.rustLight }}>{t("reportProblemBtn")}</GhostButton>
+              </>
+            )}
           </>
         )}
         {order.dispute && (
@@ -3766,7 +3938,7 @@ function NotificationsPanel({ session, onClose, onMarkAllRead, onOpen }) {
 /* ---------------------------------------------------------------------
    Seller Center
 --------------------------------------------------------------------- */
-function SellerCenterScreen({ session, myShop, myListings, mySales, matchingRequests, onAddPart, onEditShop, onEditListing, onSetStatus, onRemove, onBoost, onOpenRequest, onBack }) {
+function SellerCenterScreen({ session, myShop, myListings, mySales, matchingRequests, onAddPart, onEditShop, onEditListing, onSetStatus, onRemove, onBoost, onOpenRequest, onOpenRedeemCode, onBack }) {
   const { t, lang, dir } = useLang();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   const [tab, setTab] = useState("dashboard");
@@ -3807,6 +3979,14 @@ function SellerCenterScreen({ session, myShop, myListings, mySales, matchingRequ
           {dir === "rtl" ? <ChevronLeft size={16} color={C.steelLight} /> : <ChevronRight size={16} color={C.steelLight} />}
         </button>
       )}
+
+      <button onClick={onOpenRedeemCode} className="mx-4 mb-3 w-[calc(100%-2rem)] flex items-center gap-3 p-3.5 rounded-2xl text-left" style={{ background: C.amberLight, border: `1px solid ${C.amber}` }}>
+        <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: C.amber }}><Rocket size={16} color="#fff" /></div>
+        <div className="flex-1">
+          <p className="text-xs font-bold" style={{ color: C.amberDark }}>{t("redeemCodePrompt")}</p>
+        </div>
+        {dir === "rtl" ? <ChevronLeft size={16} color={C.amberDark} /> : <ChevronRight size={16} color={C.amberDark} />}
+      </button>
 
       <div className="flex px-4 gap-1 border-b" style={{ borderColor: C.line }}>
         {[{ id: "dashboard", label: t("dashboardTab") }, { id: "inventory", label: t("inventoryTab") }, { id: "financials", label: t("financialsTab") }, { id: "matching", label: t("matchingTab") }].map((tb) => (
@@ -4547,7 +4727,7 @@ function BoostModal({ onClose, onBoost }) {
 /* ---------------------------------------------------------------------
    ADMIN / OWNER DASHBOARD
 --------------------------------------------------------------------- */
-function AdminScreen({ listings, revenue, session, flash, pendingListings, adminShops, adminSettlements, adminRefunds, adminBankTransfers, onModerate, onVerify, onRemove, onDeleteShop, onExit, onMarkCommissionSettled, onUpdateRefundStatus, onVerifyBankConfirmation }) {
+function AdminScreen({ listings, revenue, session, pendingListings, adminShops, adminSettlements, adminRefunds, adminBankTransfers, onModerate, onVerify, onRemove, onDeleteShop, onExit, onMarkCommissionSettled, onUpdateRefundStatus, onVerifyBankConfirmation }) {
   const { t, lang } = useLang();
   const [tab, setTab] = useState("overview");
   const activeListings = listings.filter((l) => l.status === "active");
@@ -4605,13 +4785,9 @@ function AdminScreen({ listings, revenue, session, flash, pendingListings, admin
   }, [tab, session.token]);
 
   async function handleDeleteListing(id) {
-    try {
-      await adminApi.deleteListing(id, session.token);
-      setAllListings((prev) => prev.filter((l) => l.id !== id));
-      flash(t("listingDeletedToast"));
-    } catch (e) {
-      flash(e.message);
-    }
+    await adminApi.deleteListing(id, session.token);
+    setAllListings((prev) => prev.filter((l) => l.id !== id));
+    return t("listingDeletedToast");
   }
   const [confirmAction, setConfirmAction] = useState(null); // { message, onConfirm }
 
@@ -4794,7 +4970,7 @@ function AdminScreen({ listings, revenue, session, flash, pendingListings, admin
                   </div>
                   <div className="flex gap-1.5 flex-shrink-0">
                     {l.status === "active" && <button onClick={() => onRemove(l.id)} className="p-2 rounded-lg" style={{ background: C.amberLight }} title={t("removeListingBtn")}><EyeOff size={14} color={C.amberDark} /></button>}
-                    <button onClick={() => setConfirmAction({ message: t("confirmDeleteListing"), onConfirm: () => handleDeleteListing(l.id) })} className="p-2 rounded-lg" style={{ background: C.rustLight }} title={t("deletePermanentlyBtn")}><Trash2 size={14} color={C.rust} /></button>
+                    <button onClick={() => setConfirmAction({ message: t("confirmDeleteListing"), run: () => handleDeleteListing(l.id) })} className="p-2 rounded-lg" style={{ background: C.rustLight }} title={t("deletePermanentlyBtn")}><Trash2 size={14} color={C.rust} /></button>
                   </div>
                 </div>
               ))}
@@ -4815,7 +4991,7 @@ function AdminScreen({ listings, revenue, session, flash, pendingListings, admin
                   <p className="text-xs mt-1" style={{ color: C.steel }}>{s.ownerName} · {label(findCity(s.city), lang)} · {s.listingCount} {t("listingsCount")} · <Badge tone={s.status === "approved" ? "green" : "amber"}>{s.status}</Badge></p>
                   <div className="flex gap-1.5 mt-2">
                     {s.status !== "approved" && <button onClick={() => onVerify(s.id)} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.greenLight, color: C.green }}>{t("verifyShop")}</button>}
-                    <button onClick={() => setConfirmAction({ message: t("confirmDeleteShop"), onConfirm: () => onDeleteShop(s.id) })} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.rustLight, color: C.rust }}>{t("deletePermanentlyBtn")}</button>
+                    <button onClick={() => setConfirmAction({ message: t("confirmDeleteShop"), run: async () => { await onDeleteShop(s.id); return t("shopDeletedToast"); } })} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.rustLight, color: C.rust }}>{t("deletePermanentlyBtn")}</button>
                   </div>
                 </div>
               ))}
@@ -4891,13 +5067,7 @@ function AdminScreen({ listings, revenue, session, flash, pendingListings, admin
         )}
       </div>
       {confirmAction && (
-        <Modal title={t("confirmTitle")} onClose={() => setConfirmAction(null)}>
-          <p className="text-sm mb-4" style={{ color: C.asphalt }}>{confirmAction.message}</p>
-          <div className="flex gap-2">
-            <GhostButton full onClick={() => setConfirmAction(null)}>{t("cancel")}</GhostButton>
-            <PrimaryButton full onClick={() => { confirmAction.onConfirm(); setConfirmAction(null); }} style={{ background: C.rust }}>{t("deletePermanentlyBtn")}</PrimaryButton>
-          </div>
-        </Modal>
+        <ConfirmActionModal message={confirmAction.message} run={confirmAction.run} onClose={() => setConfirmAction(null)} />
       )}
     </div>
   );
