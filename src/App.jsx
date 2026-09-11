@@ -2020,6 +2020,10 @@ function AppInner() {
       setListings(listings.map((l) => (l.id === listingId ? { ...l, status: "removed" } : l)));
       setMyListingsAll(myListingsAll.map((l) => (l.id === listingId ? { ...l, status: "removed" } : l)));
       flash(t("listingRemovedToast"));
+      // Only navigate away if this was called from the listing's own
+      // detail page (Seller Center's inventory list stays put and just
+      // re-renders with the updated status instead).
+      if (screen === "listing") { setActiveListing(null); setScreen("account"); }
     } catch (e) {
       flash(e.message);
     }
@@ -2434,7 +2438,8 @@ function AppInner() {
               isFavorite={favoriteIds.includes(activeListing.id)}
               onToggleFavorite={() => requireLogin(() => toggleFavorite(activeListing.id))}
               onMessageSeller={() => requireLogin(() => setShowThreadMessage({ scope: "listing", scopeId: activeListing.id }))}
-              onViewConversations={() => setShowThreadConversations({ scope: "listing", scopeId: activeListing.id })} />
+              onViewConversations={() => setShowThreadConversations({ scope: "listing", scopeId: activeListing.id })}
+              onRemoveListing={() => handleRemoveListing(activeListing.id)} />
           )}
           {screen === "requests" && (
             <RequestsScreen requests={requests} session={session}
@@ -2992,7 +2997,7 @@ function ShopProfileScreen({ shop, listings, orders, onBack, onOpen }) {
   );
 }
 
-function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isOwner, onOpenShop, isFavorite, onToggleFavorite, onMessageSeller, onViewConversations }) {
+function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isOwner, onOpenShop, isFavorite, onToggleFavorite, onMessageSeller, onViewConversations, onRemoveListing }) {
   const { t, lang, dir } = useLang();
   const Icon = CAT_ICON[listing.category] || Package;
   const shop = listing.shopId ? shops.find((s) => s.id === listing.shopId) : null;
@@ -3092,6 +3097,7 @@ function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isO
             <>
               {listing.status === "active" && <PrimaryButton full onClick={onMarkSold}>{t("markAsSold")}</PrimaryButton>}
               <GhostButton full icon={MessageCircle} onClick={onViewConversations}>{t("conversationsTitle")}</GhostButton>
+              {listing.status === "active" && <GhostButton full icon={Trash2} onClick={onRemoveListing} style={{ color: C.rust, borderColor: C.rustLight }}>{t("removeListingBtn")}</GhostButton>}
             </>
           ) : listing.status === "active" ? (
             <>
@@ -4496,7 +4502,7 @@ function ImageUploader({ images, onChange, purpose, session, maxImages = 10 }) {
           </button>
         )}
       </div>
-      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleFilesSelected} style={{ display: "none" }} />
+      <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFilesSelected} style={{ display: "none" }} />
     </div>
   );
 }
