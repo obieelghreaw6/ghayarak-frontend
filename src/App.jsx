@@ -104,6 +104,7 @@ const T = {
     noMatchTitle: "No parts match yet",
     noMatchSub: "Try another category, city, or search term.",
     back: "Back",
+    noExactMatchNote: "No exact match for \"{q}\" — send it to sellers instead?", requestItBtn: "Request it",
     cancel: "Cancel", close: "Close", confirmTitle: "Are you sure?", listingDeletedToast: "Listing deleted.",
     descriptionLabel: "DESCRIPTION",
     views: "views", daysAgo: "d ago",
@@ -513,6 +514,7 @@ const T = {
     noMatchTitle: "لا توجد قطع مطابقة بعد",
     noMatchSub: "جرّب قسمًا آخر، مدينة أخرى، أو كلمة بحث مختلفة.",
     back: "رجوع",
+    noExactMatchNote: "لا توجد نتيجة مطابقة لـ \"{q}\" — نرسلها للبائعين؟", requestItBtn: "اطلبها",
     cancel: "إلغاء", close: "إغلاق", confirmTitle: "هل أنت متأكد؟", listingDeletedToast: "تم حذف الإعلان.",
     descriptionLabel: "الوصف",
     views: "مشاهدة", daysAgo: "يوم مضى",
@@ -1605,7 +1607,7 @@ function AppInner() {
   const [showPostChoice, setShowPostChoice] = useState(false);
   const [showBoost, setShowBoost] = useState(null);
   const [showShopCreate, setShowShopCreate] = useState(false);
-  const [showNewRequest, setShowNewRequest] = useState(false);
+  const [showNewRequest, setShowNewRequest] = useState(null);
   const [showOffer, setShowOffer] = useState(null);
   const [showBuy, setShowBuy] = useState(null);
   const [showDispute, setShowDispute] = useState(null);
@@ -2394,7 +2396,7 @@ function AppInner() {
               vehicleTypeFilter={vehicleTypeFilter} setVehicleTypeFilter={setVehicleTypeFilter}
               availableNowOnly={availableNowOnly} setAvailableNowOnly={setAvailableNowOnly}
               onOpen={(l) => { setActiveListing(l); setScreen("listing"); }}
-              onNewRequest={() => requireLogin(() => setShowNewRequest(true))}
+              onNewRequest={() => requireLogin(() => setShowNewRequest(""))}
               onSearchByPhoto={() => flash(t("searchByPhotoComingSoon"))}
               session={session} recentSearches={recentSearches} onCommitSearch={commitSearch}
               onAddCar={() => requireLogin(() => setShowAddCar(true))}
@@ -2406,7 +2408,7 @@ function AppInner() {
               onBack={() => setScreen("home")}
               onOpen={(l) => { setActiveListing(l); setScreen("listing"); }}
               onOpenShop={(id) => { setActiveShopId(id); setScreen("shop"); }}
-              onNewRequest={() => requireLogin(() => setShowNewRequest(true))} />
+              onNewRequest={() => requireLogin(() => setShowNewRequest(query))} />
           )}
           {screen === "shop" && activeShopId && (
             <ShopProfileScreen shop={activeShop} listings={activeShop?.listings || []}
@@ -2444,7 +2446,7 @@ function AppInner() {
           {screen === "requests" && (
             <RequestsScreen requests={requests} session={session}
               onOpen={handleOpenRequest}
-              onNewRequest={() => requireLogin(() => setShowNewRequest(true))} />
+              onNewRequest={() => requireLogin(() => setShowNewRequest(""))} />
           )}
           {screen === "requestDetail" && activeRequest && (
             <RequestDetail request={activeRequest} session={session} myShop={myShop}
@@ -2518,7 +2520,7 @@ function AppInner() {
         {showAddCar && session && <AddCarModal onClose={() => setShowAddCar(false)} onSave={handleSaveCar} />}
         {showShopCreate && session && <CreateShopModal onClose={() => setShowShopCreate(false)} onSubmit={handleCreateShop} />}
         {showBoost && <BoostModal onClose={() => setShowBoost(null)} onBoost={() => handleBoost(showBoost)} />}
-        {showNewRequest && session && <NewRequestModal onClose={() => setShowNewRequest(false)} onSubmit={handleCreateRequest} />}
+        {showNewRequest !== null && session && <NewRequestModal onClose={() => setShowNewRequest(null)} onSubmit={handleCreateRequest} initialDescription={showNewRequest} />}
         {showOffer && session && <OfferModal onClose={() => setShowOffer(null)} onSubmit={(form) => handleSubmitOffer(showOffer, form)} />}
         {showBuy && session && <BuyModal listing={showBuy} onClose={() => setShowBuy(null)} onSubmit={(form) => handleCreateOrder(showBuy, form)} />}
         {showRedeemCode && session && (
@@ -2922,10 +2924,22 @@ function SearchResultsScreen({ query, listings, shops, onBack, onOpen, onOpenSho
         </div>
       ) : (
         <div className="px-4">
-          {exact.length > 0 && (
+          {exact.length > 0 ? (
             <div className="mb-1">
               {related.length > 0 && <p className="text-xs font-bold uppercase mb-2" style={{ color: C.steel, letterSpacing: 0.5 }}>{t("exactMatches")}</p>}
               <div className="grid grid-cols-2 gap-3">{exact.map((l) => <ListingCard key={l.id} listing={l} shops={shops} onOpen={onOpen} />)}</div>
+            </div>
+          ) : (
+            // No exact match, but the category/year inference found
+            // something nearby — don't let the person leave empty-handed
+            // just because the related section technically has results;
+            // the specific thing they searched for still needs a home.
+            <div className="p-3.5 rounded-xl mb-4 flex items-center gap-3" style={{ background: C.amberLight }}>
+              <PackageSearch size={20} color={C.amberDark} className="flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p dir="auto" className="text-xs font-semibold" style={{ color: C.amberDark, unicodeBidi: "plaintext" }}>{t("noExactMatchNote", { q: query })}</p>
+              </div>
+              <PrimaryButton onClick={onNewRequest} style={{ flexShrink: 0, padding: "8px 14px", fontSize: 12 }}>{t("requestItBtn")}</PrimaryButton>
             </div>
           )}
           {related.length > 0 && (
@@ -3270,9 +3284,9 @@ function RequestDetail({ request, session, myShop, onBack, onOffer, onAccept, on
   );
 }
 
-function NewRequestModal({ onClose, onSubmit }) {
+function NewRequestModal({ onClose, onSubmit, initialDescription }) {
   const { t, lang } = useLang();
-  const [form, setForm] = useState({ make: MAKES[0], model: "", year: "", partDescription: "", conditionPreference: "any", city: CITIES[0].id, urgency: "flexible" });
+  const [form, setForm] = useState({ make: MAKES[0], model: "", year: "", partDescription: initialDescription || "", conditionPreference: "any", city: CITIES[0].id, urgency: "flexible" });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const valid = form.partDescription.trim() && form.model.trim();
 
