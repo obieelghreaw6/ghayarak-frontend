@@ -315,7 +315,8 @@ const T = {
     orderId: "Order",
     buyerLabel: "Buyer", sellerLabel: "Seller",
     paymentMethodShown: "Payment", deliveryMethodShown: "Delivery method",
-    commissionOwedLabel: "Platform commission (seller owes this to Ghayarak)",
+    commissionOwedLabel: "Ghayarak commission",
+    yourEarningsLabel: "Your earnings", saleAmountLabel: "Sale amount", youReceiveLabel: "You receive",
     backToOrders: "Back",
     rejectOrderBtn: "Decline order",
     cancelOrderBtn: "Cancel order",
@@ -725,7 +726,8 @@ const T = {
     orderId: "الطلب",
     buyerLabel: "المشتري", sellerLabel: "البائع",
     paymentMethodShown: "الدفع", deliveryMethodShown: "طريقة الاستلام",
-    commissionOwedLabel: "عمولة المنصة (مستحقة على البائع لصالح غيارك)",
+    commissionOwedLabel: "عمولة غيارك",
+    yourEarningsLabel: "أرباحك", saleAmountLabel: "مبلغ البيع", youReceiveLabel: "تستلم",
     backToOrders: "رجوع",
     rejectOrderBtn: "رفض الطلب",
     cancelOrderBtn: "إلغاء الطلب",
@@ -1809,9 +1811,12 @@ function AppInner() {
   }, [screen, session?.token]);
 
   // Part requests are public to browse — fetched when actually entering
-  // the Requests screen, not on every app load.
+  // the Requests screen, or Seller Center (whose "matching requests"
+  // banner is computed from this same array and would silently show
+  // zero otherwise, unless the seller happened to visit Requests first
+  // in the same session).
   useEffect(() => {
-    if (screen !== "requests") return;
+    if (!["requests", "seller"].includes(screen)) return;
     (async () => {
       try {
         const { requests: apiRequests } = await requestsApi.list(null, session?.token);
@@ -3744,9 +3749,11 @@ function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, on
         </div>
 
         {isSeller && (
-          <div className="mt-2 p-2.5 rounded-lg flex items-center justify-between" style={{ background: C.amberLight }}>
-            <span className="text-xs font-semibold flex items-center gap-1" style={{ color: C.amberDark }}><CircleDollarSign size={12} />{t("commissionOwedLabel")}</span>
-            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, color: C.amberDark }}>{order.commissionAmount.toLocaleString()} {cur}</span>
+          <div className="mt-2 p-3 rounded-xl" style={{ background: C.amberLight }}>
+            <p className="text-xs font-semibold mb-2 flex items-center gap-1" style={{ color: C.amberDark }}><CircleDollarSign size={12} />{t("yourEarningsLabel")}</p>
+            <div className="flex items-center justify-between text-xs mb-1"><span style={{ color: C.amberDark }}>{t("saleAmountLabel")}</span><span style={{ fontFamily: "'IBM Plex Mono', monospace", color: C.amberDark }}>{order.partPrice.toLocaleString()} {cur}</span></div>
+            <div className="flex items-center justify-between text-xs mb-1"><span style={{ color: C.amberDark }}>{t("commissionOwedLabel")}</span><span style={{ fontFamily: "'IBM Plex Mono', monospace", color: C.amberDark }}>−{order.commissionAmount.toLocaleString()} {cur}</span></div>
+            <div className="flex items-center justify-between text-xs pt-1.5 mt-1 border-t font-bold" style={{ borderColor: "rgba(162,101,44,0.25)" }}><span style={{ color: C.amberDark }}>{t("youReceiveLabel")}</span><span style={{ fontFamily: "'IBM Plex Mono', monospace", color: C.amberDark }}>{(order.partPrice - order.commissionAmount).toLocaleString()} {cur}</span></div>
           </div>
         )}
       </div>
