@@ -1,0 +1,10 @@
+{
+  "appId": "com.ghayarak.app",
+  "appName": "غيارك",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://ghayarak-frontend.vercel.app",
+    "cleartext": false
+  }
+}
