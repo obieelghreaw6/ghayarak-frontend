@@ -7,7 +7,7 @@ import {
   CircleDot, LogOut, Camera, Lightbulb, Wind, Gauge, Armchair,
   RectangleHorizontal, Cog, Settings2, Disc, Sparkles, BadgeCheck, AlertTriangle, Trash2,
   Rocket, Building2, Eye, EyeOff, MessageCircle,
-  Languages, ShoppingCart, Truck, Bike, AlertOctagon, PackageCheck, Info,
+  Languages, ShoppingCart, Truck, Bike, AlertOctagon, PackageCheck, Info, Ban,
   CircleDollarSign, Flag, ChevronDown, Home, Filter as FilterIcon, Send, Bell, PackageSearch
 } from "lucide-react";
 import {
@@ -104,14 +104,27 @@ const T = {
     noMatchTitle: "No parts match yet",
     noMatchSub: "Try another category, city, or search term.",
     back: "Back",
+    sellerStatusApproved: "Active", sellerStatusSuspended: "Suspended", sellerStatusBanned: "Banned", sellerStatusPending: "Pending",
+    untilLabel: "until", suspendBtn: "Suspend", reinstateBtn: "Reinstate", suspendSellerBtn: "Suspend seller",
+    suspensionReasonLabel: "Reason (required, kept on record)", suspensionReasonPlaceholder: "Why is this account being suspended?",
+    temporarySuspension: "Temporary", permanentSuspension: "Permanent", suspensionDaysLabel: "Days",
+    confirmSuspensionBtn: "Confirm Suspension", suspendModalTitle: "Suspend {name}",
+    reinstatedToast: "Reinstated.", suspendedToast: "Suspended.",
+    sourcingConfirmedToast: "Sourcing confirmed — order moving forward.",
+    sourcingInProgressNote: "You're sourcing this part (est. {n} days). Confirm once you actually have it.",
+    sourcingInProgressBuyerNote: "The seller is sourcing this part (est. {n} days).",
+    confirmSourcedBtn: "I have it now", cantSourceBtn: "Can't source it after all",
+    canSourceCheckbox: "I don't have it in stock, but I can source it", sourcingDaysField: "Days to source",
+    canSourceBadge: "Can source in {n} days", matchedInMinutes: "Matched in {n} minutes", matchedInHours: "Matched in {n}h",
+    completionRateLabel: "completion", avgResponseLabel: "~{n}h response",
     noExactMatchNote: "No exact match for \"{q}\" — send it to sellers instead?", requestItBtn: "Request it",
     cancel: "Cancel", close: "Close", confirmTitle: "Are you sure?", listingDeletedToast: "Listing deleted.",
     descriptionLabel: "DESCRIPTION",
     views: "views", daysAgo: "d ago",
     markAsSold: "Mark as sold",
-    protectedDealTitle: "Protected Deal available",
-    protectedDealText: "Ghayarak doesn't hold your money — you pay the seller directly. With a Protected Deal, you can report a problem within 48 hours of receiving the part and our team will review it. Protection fee: {fee} LYD, paid by the buyer.",
-    protectedDeal: "Protected Deal",
+    protectedDealTitle: "Ghayarak Protected",
+    protectedDealText: "Ghayarak doesn't hold your money — you pay the seller directly, but every part of this deal is tracked: the seller is verified, the order and messages are recorded, and if something's wrong you can report it with photo evidence within 48 hours of receiving the part for our team to review. Protection fee: {fee} LYD, paid by the buyer.",
+    protectedDeal: "Ghayarak Protected",
     featured: "Featured",
     individual: "Individual",
     myListings: "MY LISTINGS",
@@ -295,7 +308,7 @@ const T = {
     myOrdersLabel: "My orders", mySalesLabel: "My sales",
     noOrdersYet: "You haven't bought anything yet.",
     noSalesYet: "No orders on your listings yet.",
-    orderStatusPending: "awaiting seller", orderStatusAccepted: "accepted", orderStatusPreparing: "preparing",
+    orderStatusPending: "awaiting seller", orderStatusSourcing: "sourcing", orderStatusAccepted: "accepted", orderStatusPreparing: "preparing",
     orderStatusReady_for_pickup: "ready for pickup", orderStatusOut_for_delivery: "out for delivery",
     orderStatusCollected: "collected", orderStatusDelivered: "delivered", orderStatusCompleted: "completed",
     orderStatusDisputed: "disputed", orderStatusCancelled: "cancelled", orderStatusRefunded: "refunded",
@@ -308,6 +321,7 @@ const T = {
     orderCompletedToast: "Order completed. Commission invoiced to the seller.",
     disputeTitle: "Report a problem",
     disputeReasonLabel: "What went wrong?",
+    disputeEvidenceLabel: "Photos (optional but helps a lot)",
     disputeDescLabel: "Details",
     disputeDescPlaceholder: "Explain what happened…",
     submitDisputeBtn: "Submit report",
@@ -515,14 +529,27 @@ const T = {
     noMatchTitle: "لا توجد قطع مطابقة بعد",
     noMatchSub: "جرّب قسمًا آخر، مدينة أخرى، أو كلمة بحث مختلفة.",
     back: "رجوع",
+    sellerStatusApproved: "نشط", sellerStatusSuspended: "موقوف", sellerStatusBanned: "محظور", sellerStatusPending: "قيد الانتظار",
+    untilLabel: "حتى", suspendBtn: "إيقاف", reinstateBtn: "إعادة تفعيل", suspendSellerBtn: "إيقاف البائع",
+    suspensionReasonLabel: "السبب (مطلوب، يُحفظ في السجل)", suspensionReasonPlaceholder: "لماذا يتم إيقاف هذا الحساب؟",
+    temporarySuspension: "مؤقت", permanentSuspension: "دائم", suspensionDaysLabel: "عدد الأيام",
+    confirmSuspensionBtn: "تأكيد الإيقاف", suspendModalTitle: "إيقاف {name}",
+    reinstatedToast: "تمت إعادة التفعيل.", suspendedToast: "تم الإيقاف.",
+    sourcingConfirmedToast: "تم تأكيد التوفير — الطلب يتقدم.",
+    sourcingInProgressNote: "أنت تُوفّر هذه القطعة (تقريبًا {n} أيام). أكّد بمجرد حصولك عليها فعليًا.",
+    sourcingInProgressBuyerNote: "البائع يُوفّر هذه القطعة حاليًا (تقريبًا {n} أيام).",
+    confirmSourcedBtn: "حصلت عليها الآن", cantSourceBtn: "تعذّر توفيرها",
+    canSourceCheckbox: "ليست متوفرة لدي لكن أقدر أوفّرها", sourcingDaysField: "عدد أيام التوفير",
+    canSourceBadge: "يوفّرها خلال {n} أيام", matchedInMinutes: "تم الإيجاد خلال {n} دقيقة", matchedInHours: "تم الإيجاد خلال {n} س",
+    completionRateLabel: "إتمام", avgResponseLabel: "~{n} س للرد",
     noExactMatchNote: "لا توجد نتيجة مطابقة لـ \"{q}\" — نرسلها للبائعين؟", requestItBtn: "اطلبها",
     cancel: "إلغاء", close: "إغلاق", confirmTitle: "هل أنت متأكد؟", listingDeletedToast: "تم حذف الإعلان.",
     descriptionLabel: "الوصف",
     views: "مشاهدة", daysAgo: "يوم مضى",
     markAsSold: "تحديد كمُباع",
-    protectedDealTitle: "الصفقة المحمية متاحة",
-    protectedDealText: "غيارك لا يحتفظ بأموالك — تدفع البائع مباشرة. مع الصفقة المحمية، يمكنك الإبلاغ عن أي مشكلة خلال 48 ساعة من الاستلام وسيراجعها فريقنا. رسوم الحماية: {fee} د.ل، يدفعها المشتري.",
-    protectedDeal: "صفقة محمية",
+    protectedDealTitle: "غيارك المحمية",
+    protectedDealText: "غيارك لا يحتفظ بأموالك — تدفع البائع مباشرة، لكن كل جزء من هذه الصفقة موثّق: البائع موثّق، الطلب والرسائل مسجّلة، وإذا واجهت مشكلة يمكنك الإبلاغ عنها مع صور خلال 48 ساعة من الاستلام ليراجعها فريقنا. رسوم الحماية: {fee} د.ل، يدفعها المشتري.",
+    protectedDeal: "غيارك المحمية",
     featured: "مميّز",
     individual: "فرد",
     myListings: "إعلاناتي",
@@ -706,7 +733,7 @@ const T = {
     myOrdersLabel: "مشترياتي", mySalesLabel: "مبيعاتي",
     noOrdersYet: "لم تشترِ أي شيء بعد.",
     noSalesYet: "لا توجد طلبات على إعلاناتك بعد.",
-    orderStatusPending: "بانتظار البائع", orderStatusAccepted: "مقبول", orderStatusPreparing: "قيد التجهيز",
+    orderStatusPending: "بانتظار البائع", orderStatusSourcing: "قيد التوفير", orderStatusAccepted: "مقبول", orderStatusPreparing: "قيد التجهيز",
     orderStatusReady_for_pickup: "جاهز للاستلام", orderStatusOut_for_delivery: "في الطريق",
     orderStatusCollected: "تم الاستلام", orderStatusDelivered: "تم التسليم", orderStatusCompleted: "مكتمل",
     orderStatusDisputed: "قيد النزاع", orderStatusCancelled: "ملغي", orderStatusRefunded: "مُسترد",
@@ -719,6 +746,7 @@ const T = {
     orderCompletedToast: "اكتمل الطلب. تم إصدار فاتورة العمولة للبائع.",
     disputeTitle: "الإبلاغ عن مشكلة",
     disputeReasonLabel: "ما هي المشكلة؟",
+    disputeEvidenceLabel: "صور (اختياري لكنها تساعد كثيرًا)",
     disputeDescLabel: "التفاصيل",
     disputeDescPlaceholder: "اشرح ما حدث…",
     submitDisputeBtn: "إرسال البلاغ",
@@ -1087,7 +1115,7 @@ const adminApi = {
   moderateListing: (id, decision, note, token) => apiRequest(`/admin/listings/${id}/moderate`, { method: "POST", body: JSON.stringify({ decision, note }), headers: { Authorization: `Bearer ${token}` } }),
   getSellers: (token) => apiRequest("/admin/sellers", { headers: { Authorization: `Bearer ${token}` } }),
   verifyShop: (id, token) => apiRequest(`/admin/shops/${id}/verify`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
-  updateSellerStatus: (type, id, status, reason, token) => apiRequest(`/admin/sellers/${type}/${id}/status`, { method: "POST", body: JSON.stringify({ status, reason }), headers: { Authorization: `Bearer ${token}` } }),
+  updateSellerStatus: (type, id, status, reason, suspendedUntil, token) => apiRequest(`/admin/sellers/${type}/${id}/status`, { method: "POST", body: JSON.stringify({ status, reason, suspendedUntil }), headers: { Authorization: `Bearer ${token}` } }),
   getSettlements: (token) => apiRequest("/admin/settlements", { headers: { Authorization: `Bearer ${token}` } }),
   markSettlementPaid: (id, token) => apiRequest(`/admin/settlements/${id}/mark-paid`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
   getRefunds: (token) => apiRequest("/admin/refunds", { headers: { Authorization: `Bearer ${token}` } }),
@@ -1102,14 +1130,16 @@ const adminApi = {
 const ordersApi = {
   list: (role, token) => apiRequest(`/orders?role=${role}`, { headers: { Authorization: `Bearer ${token}` } }),
   get: (id, token) => apiRequest(`/orders/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+  getSellerStats: (sellerId) => apiRequest(`/orders/seller-stats/${sellerId}`),
   create: (body, token) => apiRequest("/orders", { method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
   accept: (id, token) => apiRequest(`/orders/${id}/accept`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
+  confirmSourced: (id, token) => apiRequest(`/orders/${id}/confirm-sourced`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
   cancel: (id, reason, token) => apiRequest(`/orders/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason }), headers: { Authorization: `Bearer ${token}` } }),
   prepare: (id, token) => apiRequest(`/orders/${id}/prepare`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
   dispatch: (id, token) => apiRequest(`/orders/${id}/dispatch`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
   fulfil: (id, token) => apiRequest(`/orders/${id}/fulfil`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
   confirm: (id, token) => apiRequest(`/orders/${id}/confirm`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
-  dispute: (id, reason, description, token) => apiRequest(`/orders/${id}/dispute`, { method: "POST", body: JSON.stringify({ reason, description }), headers: { Authorization: `Bearer ${token}` } }),
+  dispute: (id, reason, description, images, token) => apiRequest(`/orders/${id}/dispute`, { method: "POST", body: JSON.stringify({ reason, description, images }), headers: { Authorization: `Bearer ${token}` } }),
   submitBankConfirmation: (id, referenceText, token) => apiRequest(`/orders/${id}/bank-transfer-confirmation`, { method: "POST", body: JSON.stringify({ referenceText }), headers: { Authorization: `Bearer ${token}` } }),
   requestRefund: (id, amount, reason, token) => apiRequest(`/orders/${id}/refund-request`, { method: "POST", body: JSON.stringify({ amount, reason }), headers: { Authorization: `Bearer ${token}` } }),
   redeemCode: (id, code, token) => apiRequest(`/orders/${id}/redeem-code`, { method: "POST", body: JSON.stringify({ code }), headers: { Authorization: `Bearer ${token}` } }),
@@ -1192,6 +1222,8 @@ function mapApiOffer(o) {
     condition: o.condition,
     notes: o.notes,
     delivery: o.delivery_available,
+    canSource: o.can_source,
+    sourcingDays: o.sourcing_days,
     createdAt: o.created_at ? new Date(o.created_at).getTime() : Date.now(),
   };
 }
@@ -1239,6 +1271,9 @@ function mapApiShop(s) {
     deliveryAvailable: s.delivery_available,
     subscriptionExpiry: s.subscription_expiry ? new Date(s.subscription_expiry).getTime() : null,
     createdAt: s.created_at ? new Date(s.created_at).getTime() : Date.now(),
+    status: s.status,
+    statusReason: s.status_reason,
+    suspendedUntil: s.suspended_until ? new Date(s.suspended_until).getTime() : null,
     // No ratings/reviews or sales-aggregation system exists in the
     // backend yet — these default safely rather than being left
     // undefined, since ShopProfileScreen calls .toLocaleString() on
@@ -1263,6 +1298,10 @@ function mapApiOrder(o, extras = {}) {
     id: o.id,
     listingId: o.listing_id,
     listingTitle: o.listing_title,
+    requestId: o.request_id,
+    offerId: o.offer_id,
+    canSource: o.can_source,
+    sourcingDays: o.sourcing_days,
     buyerId: o.buyer_id,
     sellerId: o.seller_id,
     shopId: o.shop_id,
@@ -1291,7 +1330,7 @@ function mapApiOrder(o, extras = {}) {
     completedAt: o.completed_at,
     refund: latestRefund ? { status: latestRefund.status, amount: Number(latestRefund.amount), reason: latestRefund.reason } : null,
     bankTransferConfirmation: latestBankConfirmation ? { status: latestBankConfirmation.status, referenceText: latestBankConfirmation.reference_text } : null,
-    dispute: latestDispute ? { reason: latestDispute.reason, description: latestDispute.description, status: latestDispute.status } : null,
+    dispute: latestDispute ? { reason: latestDispute.reason, description: latestDispute.description, status: latestDispute.status, images: latestDispute.images || [] } : null,
   };
 }
 
@@ -1997,12 +2036,22 @@ function AppInner() {
   }
   async function handleVerifyShop(shopId) {
     try {
-      await adminApi.updateSellerStatus("shop", shopId, "approved", null, session.token);
+      await adminApi.updateSellerStatus("shop", shopId, "approved", null, null, session.token);
       await adminApi.verifyShop(shopId, session.token);
       flash(t("shopVerifiedToast"));
     } catch (e) {
       flash(e.message);
     }
+  }
+  // Deliberately does NOT catch its own errors — SuspendModal awaits this
+  // and shows the failure inline, keeping itself open so the admin can
+  // fix and retry rather than losing what they typed.
+  async function handleUpdateSellerStatus(type, id, status, reason, suspendedUntil) {
+    const result = await adminApi.updateSellerStatus(type, id, status, reason, suspendedUntil, session.token);
+    if (type === "shop" && result.shop) {
+      setAdminShops(adminShops.map((s) => (s.id === id ? { ...s, status: result.shop.status, statusReason: result.shop.status_reason, suspendedUntil: result.shop.suspended_until ? new Date(result.shop.suspended_until).getTime() : null } : s)));
+    }
+    flash(status === "approved" ? t("reinstatedToast") : t("suspendedToast"));
   }
   async function handleDeleteShop(shopId) {
     await adminApi.deleteShop(shopId, session.token);
@@ -2132,12 +2181,19 @@ function AppInner() {
   }
   async function handleAcceptOffer(requestId, offerId) {
     try {
-      await requestsApi.acceptOffer(requestId, offerId, session.token);
+      const { order } = await requestsApi.acceptOffer(requestId, offerId, session.token);
       const { request, offers } = await requestsApi.get(requestId, session.token);
       const mapped = mapApiRequest(request, offers);
       setActiveRequest(mapped);
       setRequests(requests.map((r) => (r.id === requestId ? mapped : r)));
       flash(t("offerAcceptedToast"));
+      // A real order now exists behind this acceptance — take the buyer
+      // straight to it, same as any other purchase, rather than leaving
+      // them on the request with no visible next step.
+      if (order) {
+        await refreshOrder(order.id);
+        setScreen("orderDetail");
+      }
     } catch (e) {
       flash(e.message);
     }
@@ -2212,6 +2268,10 @@ function AppInner() {
     try { await ordersApi.accept(orderId, session.token); await refreshOrder(orderId); flash(t("orderAcceptedToast")); }
     catch (e) { flash(e.message); }
   }
+  async function handleConfirmSourced(orderId) {
+    try { await ordersApi.confirmSourced(orderId, session.token); await refreshOrder(orderId); flash(t("sourcingConfirmedToast")); }
+    catch (e) { flash(e.message); }
+  }
 
   // --- Fulfilment: accepted -> preparing -> (ready_for_pickup | out_for_delivery) -> (collected | delivered) -> completed ---
   async function handlePrepareOrder(orderId) {
@@ -2257,7 +2317,7 @@ function AppInner() {
   }
   async function handleSubmitDispute(orderId, form) {
     try {
-      await ordersApi.dispute(orderId, form.reason, form.description, session.token);
+      await ordersApi.dispute(orderId, form.reason, form.description, form.images, session.token);
       await refreshOrder(orderId);
       setShowDispute(null);
       flash(t("disputeSubmittedToast"));
@@ -2477,7 +2537,8 @@ function AppInner() {
               onSendMessage={(body) => handleSendMessage(activeOrder.id, body)}
               onRequestRefund={() => setShowRefundRequest(activeOrder.id)}
               onSubmitBankConfirmation={(ref) => handleSubmitBankConfirmation(activeOrder.id, ref)}
-              onRedeemCode={handleRedeemCode} />
+              onRedeemCode={handleRedeemCode}
+              onConfirmSourced={handleConfirmSourced} />
           )}
           {screen === "account" && (
             <AccountScreen session={session} myShop={myShop} listings={myListingsAll}
@@ -2500,6 +2561,7 @@ function AppInner() {
               pendingListings={pendingListings} onModerate={handleModerateListing}
               adminShops={adminShops} adminSettlements={adminSettlements} adminRefunds={adminRefunds} adminBankTransfers={adminBankTransfers}
               onVerify={handleVerifyShop} onRemove={handleRemoveListing} onDeleteShop={handleDeleteShop} onExit={() => setScreen("home")}
+              onUpdateSellerStatus={handleUpdateSellerStatus}
               onMarkCommissionSettled={handleMarkCommissionSettled}
               onUpdateRefundStatus={handleUpdateRefundStatus}
               onVerifyBankConfirmation={handleVerifyBankConfirmation} />
@@ -2538,7 +2600,7 @@ function AppInner() {
           <ThreadConversationsModal scope={showThreadConversations.scope} scopeId={showThreadConversations.scopeId} session={session} onClose={() => setShowThreadConversations(null)}
             onOpenThread={(otherPartyId, otherPartyName) => { const prev = showThreadConversations; setShowThreadConversations(null); setShowThreadMessage({ scope: prev.scope, scopeId: prev.scopeId, otherPartyId, otherPartyName }); }} />
         )}
-        {showDispute && session && <DisputeModal onClose={() => setShowDispute(null)} onSubmit={(form) => handleSubmitDispute(showDispute, form)} />}
+        {showDispute && session && <DisputeModal session={session} onClose={() => setShowDispute(null)} onSubmit={(form) => handleSubmitDispute(showDispute, form)} />}
         {showRefundRequest && session && <RefundRequestModal order={orders.find((o) => o.id === showRefundRequest)} onClose={() => setShowRefundRequest(null)} onSubmit={(form) => handleRequestRefund(showRefundRequest, form)} />}
         {showNotifications && session && (
           <NotificationsPanel
@@ -2967,14 +3029,29 @@ function SearchResultsScreen({ query, listings, shops, onBack, onOpen, onOpenSho
 function ShopProfileScreen({ shop, listings, orders, onBack, onOpen }) {
   const { t, lang, dir } = useLang();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
-  if (!shop) return null;
-  const city = findCity(shop.city);
-  const biz = findBusinessType(shop.businessType);
   // Real, not decorative: computed from this shop's own order history.
   // With no orders yet there's nothing to claim, so the badge just doesn't render.
   const relevantOrders = (orders || []).filter((o) => ["completed", "disputed", "refunded"].includes(o.status));
   const disputedCount = relevantOrders.filter((o) => o.status === "disputed" || o.dispute).length;
   const disputeFreeRate = relevantOrders.length > 0 ? Math.round(((relevantOrders.length - disputedCount) / relevantOrders.length) * 100) : null;
+
+  // Real seller performance, not a made-up star rating — fetched fresh
+  // per shop, since this reflects the actual owner's order history.
+  const [stats, setStats] = useState(null);
+  useEffect(() => {
+    if (!shop?.ownerId) return;
+    (async () => {
+      try {
+        setStats(await ordersApi.getSellerStats(shop.ownerId));
+      } catch (e) {
+        console.error("Could not load seller stats.", e);
+      }
+    })();
+  }, [shop?.ownerId]);
+
+  if (!shop) return null;
+  const city = findCity(shop.city);
+  const biz = findBusinessType(shop.businessType);
   return (
     <div>
       <div className="px-4 pt-3">
@@ -2991,8 +3068,13 @@ function ShopProfileScreen({ shop, listings, orders, onBack, onOpen }) {
           </div>
         </div>
         <div className="flex items-center gap-4 mt-4 pt-4 flex-wrap" style={{ borderTop: "1px solid rgba(255,255,255,0.12)" }}>
-          <span className="text-sm font-bold flex items-center gap-1" style={{ color: "#fff" }}><Star size={13} color={C.amber} fill={C.amber} />{shop.rating}</span>
-          <span className="text-xs" style={{ color: C.steelLight }}>{t("salesCountLabel", { n: shop.salesCount.toLocaleString() })}</span>
+          {stats?.completionRate !== null && stats?.completionRate !== undefined && (
+            <span className="text-sm font-bold flex items-center gap-1" style={{ color: "#fff" }}><CheckCircle2 size={13} color={C.green} />{stats.completionRate}% {t("completionRateLabel")}</span>
+          )}
+          {stats && <span className="text-xs" style={{ color: C.steelLight }}>{t("salesCountLabel", { n: stats.completedTransactions.toLocaleString() })}</span>}
+          {stats?.averageResponseHours !== null && stats?.averageResponseHours !== undefined && (
+            <span className="text-xs flex items-center gap-1" style={{ color: C.steelLight }}><Clock size={11} />{t("avgResponseLabel", { n: stats.averageResponseHours })}</span>
+          )}
           <span className="text-xs" style={{ color: C.steelLight }}>{t("shopListingsCount", { n: listings.length })}</span>
           {disputeFreeRate !== null && (
             <span className="text-xs flex items-center gap-1" style={{ color: C.steelLight }}><ShieldCheck size={11} />{disputeFreeRate}% {t("disputeFreeLabel")}</span>
@@ -3216,6 +3298,11 @@ function RequestDetail({ request, session, myShop, onBack, onOffer, onAccept, on
   const canOffer = session && !isRequester;
   const canManage = isRequester && ["open", "expired"].includes(request.status);
   const daysLeft = request.expiresAt ? Math.ceil((request.expiresAt - Date.now()) / 86400000) : null;
+  // "Time to match" — a real number from real timestamps, not a made-up
+  // marketing claim. Only shown once matched, since it's meaningless
+  // before then.
+  const acceptedOffer = request.acceptedOfferId ? request.offers.find((o) => o?.id === request.acceptedOfferId) : null;
+  const matchMinutes = acceptedOffer ? Math.round((acceptedOffer.createdAt - request.createdAt) / 60000) : null;
 
   return (
     <div className="px-4 pt-3">
@@ -3236,6 +3323,11 @@ function RequestDetail({ request, session, myShop, onBack, onOffer, onAccept, on
         {request.status === "open" && daysLeft !== null && daysLeft <= 7 && (
           <p className="text-xs mt-2 flex items-center gap-1" style={{ color: daysLeft <= 2 ? C.rust : C.steel }}>
             <Clock size={11} />{daysLeft <= 0 ? t("expiresToday") : t("expiresInDays", { n: daysLeft })}
+          </p>
+        )}
+        {matchMinutes !== null && (
+          <p className="text-xs mt-2 flex items-center gap-1 font-semibold" style={{ color: C.green }}>
+            ⏱️ {matchMinutes < 60 ? t("matchedInMinutes", { n: matchMinutes }) : t("matchedInHours", { n: Math.round(matchMinutes / 60) })}
           </p>
         )}
       </div>
@@ -3271,6 +3363,11 @@ function RequestDetail({ request, session, myShop, onBack, onOffer, onAccept, on
                 </p>
                 <PriceTag amount={o.price} />
               </div>
+              {o.canSource && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full mt-1" style={{ background: C.amberLight, color: C.amberDark }}>
+                  <Rocket size={10} />{t("canSourceBadge", { n: o.sourcingDays })}
+                </span>
+              )}
               <p className="text-xs mt-1" style={{ color: C.steel }}>{o.condition}{o.delivery ? ` · ${t("offerDeliveryCheckbox")}` : ""}</p>
               {o.notes && <p dir="auto" className="text-xs mt-1" style={{ color: C.asphalt, unicodeBidi: "plaintext" }}>{o.notes}</p>}
               <div className="flex gap-2 mt-2">
@@ -3465,6 +3562,49 @@ function RedeemCodeModal({ session, onClose, onRedeemed }) {
   );
 }
 
+// Suspending someone is deliberately more friction than a plain confirm —
+// a reason is required (this becomes the record of why, visible to the
+// seller and kept in the audit log), and the admin explicitly chooses
+// temporary vs permanent rather than defaulting to either.
+function SuspendModal({ title, onClose, onSubmit }) {
+  const { t } = useLang();
+  const [reason, setReason] = useState("");
+  const [temporary, setTemporary] = useState(true);
+  const [days, setDays] = useState("7");
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setErrorMsg("");
+    const suspendedUntil = temporary && days ? new Date(Date.now() + Number(days) * 86400000).toISOString() : null;
+    try {
+      await onSubmit(reason.trim(), suspendedUntil);
+      onClose();
+    } catch (e) {
+      setErrorMsg(e.message);
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal title={title} onClose={onClose}>
+      <Field label={t("suspensionReasonLabel")}>
+        <textarea dir="auto" style={{ ...inputStyle, minHeight: 70 }} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("suspensionReasonPlaceholder")} />
+      </Field>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <button type="button" onClick={() => setTemporary(true)} className="py-2.5 rounded-lg border text-sm font-semibold" style={{ borderColor: temporary ? C.amber : C.line, background: temporary ? C.amberLight : "#fff", color: temporary ? C.amberDark : C.asphalt }}>{t("temporarySuspension")}</button>
+        <button type="button" onClick={() => setTemporary(false)} className="py-2.5 rounded-lg border text-sm font-semibold" style={{ borderColor: !temporary ? C.rust : C.line, background: !temporary ? C.rustLight : "#fff", color: !temporary ? C.rust : C.asphalt }}>{t("permanentSuspension")}</button>
+      </div>
+      {temporary && (
+        <Field label={t("suspensionDaysLabel")}><input type="number" min="1" style={inputStyle} value={days} onChange={(e) => setDays(e.target.value)} /></Field>
+      )}
+      {errorMsg && <p className="text-xs mb-3" style={{ color: C.rust }}>{errorMsg}</p>}
+      <PrimaryButton full disabled={!reason.trim() || submitting} onClick={handleSubmit} style={{ background: C.rust }}>{submitting ? t("loading") : t("confirmSuspensionBtn")}</PrimaryButton>
+    </Modal>
+  );
+}
+
 function ConfirmActionModal({ message, run, onClose }) {
   const { t } = useLang();
   const [state, setState] = useState("idle"); // idle | loading | done | error
@@ -3552,19 +3692,26 @@ function ThreadConversationsModal({ scope, scopeId, session, onClose, onOpenThre
 
 function OfferModal({ onClose, onSubmit }) {
   const { t } = useLang();
-  const [form, setForm] = useState({ price: "", condition: "", notes: "", delivery: false });
+  const [form, setForm] = useState({ price: "", condition: "", notes: "", delivery: false, canSource: false, sourcingDays: "" });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const valid = form.price && form.condition.trim();
+  const valid = form.price && form.condition.trim() && (!form.canSource || (form.sourcingDays && +form.sourcingDays > 0));
 
   return (
     <Modal title={t("submitOfferBtn")} onClose={onClose}>
+      <label className="flex items-center gap-2 mb-4 text-sm p-2.5 rounded-lg" style={{ background: form.canSource ? C.amberLight : C.sand, color: C.asphalt }}>
+        <input type="checkbox" checked={form.canSource} onChange={(e) => set("canSource", e.target.checked)} />
+        <Rocket size={14} color={C.amberDark} /> {t("canSourceCheckbox")}
+      </label>
+      {form.canSource && (
+        <Field label={t("sourcingDaysField")}><input type="number" min="1" style={inputStyle} value={form.sourcingDays} onChange={(e) => set("sourcingDays", e.target.value)} placeholder="3" /></Field>
+      )}
       <Field label={t("offerPrice")}><input type="number" style={inputStyle} value={form.price} onChange={(e) => set("price", +e.target.value)} placeholder="0" /></Field>
       <Field label={t("offerCondition")}><input style={inputStyle} value={form.condition} onChange={(e) => set("condition", e.target.value)} placeholder="e.g. New, OEM" /></Field>
       <Field label={t("offerNotes")}><textarea dir="auto" style={{ ...inputStyle, minHeight: 60 }} value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder={t("offerNotesPlaceholder")} /></Field>
       <label className="flex items-center gap-2 mb-4 text-sm" style={{ color: C.asphalt }}>
         <input type="checkbox" checked={form.delivery} onChange={(e) => set("delivery", e.target.checked)} /> {t("offerDeliveryCheckbox")}
       </label>
-      <PrimaryButton full disabled={!valid} onClick={() => onSubmit({ ...form, price: Number(form.price) })}>{t("submitOfferBtn")}</PrimaryButton>
+      <PrimaryButton full disabled={!valid} onClick={() => onSubmit({ ...form, price: Number(form.price), sourcingDays: form.canSource ? Number(form.sourcingDays) : null })}>{t("submitOfferBtn")}</PrimaryButton>
     </Modal>
   );
 }
@@ -3687,7 +3834,7 @@ function OrderCard({ order, session, onOpen }) {
   );
 }
 
-function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, onDispatch, onFulfil, onConfirmReceipt, onDispute, onCancel, onSendMessage, onRequestRefund, onSubmitBankConfirmation, onRedeemCode }) {
+function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, onDispatch, onFulfil, onConfirmReceipt, onDispute, onCancel, onSendMessage, onRequestRefund, onSubmitBankConfirmation, onRedeemCode, onConfirmSourced }) {
   const { t, lang, dir } = useLang();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   const isBuyer = session?.id === order.buyerId;
@@ -3765,7 +3912,18 @@ function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, on
       )}
 
       <div className="mt-4 flex flex-col gap-2">
-        {isSeller && order.paymentMethod === "reserve_at_shop" && ["pending", "accepted"].includes(order.status) ? (
+        {isSeller && order.status === "sourcing" ? (
+          <div className="p-3 rounded-xl border" style={{ borderColor: C.amber, background: C.amberLight }}>
+            <p className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: C.amberDark }}><Rocket size={13} />{t("sourcingInProgressNote", { n: order.sourcingDays })}</p>
+            <PrimaryButton full onClick={() => onConfirmSourced(order.id)}>{t("confirmSourcedBtn")}</PrimaryButton>
+            <GhostButton full icon={X} onClick={() => onCancel("seller")} style={{ marginTop: 8, color: C.rust, borderColor: C.rustLight }}>{t("cantSourceBtn")}</GhostButton>
+          </div>
+        ) : isBuyer && order.status === "sourcing" ? (
+          <div className="p-3 rounded-xl border text-center" style={{ borderColor: C.line, background: "#fff" }}>
+            <p className="text-xs font-semibold flex items-center justify-center gap-1.5" style={{ color: C.amberDark }}><Rocket size={13} />{t("sourcingInProgressBuyerNote", { n: order.sourcingDays })}</p>
+            <GhostButton full icon={X} onClick={() => onCancel("buyer")} style={{ marginTop: 8, color: C.rust, borderColor: C.rustLight }}>{t("cancelOrderBtn")}</GhostButton>
+          </div>
+        ) : isSeller && order.paymentMethod === "reserve_at_shop" && ["pending", "accepted"].includes(order.status) ? (
           <div className="p-3 rounded-xl border" style={{ borderColor: C.line, background: "#fff" }}>
             <p className="text-xs font-semibold mb-2" style={{ color: C.steel }}>{t("enterCodeToRedeem")}</p>
             <input dir="auto" value={redeemInput} onChange={(e) => setRedeemInput(e.target.value.toUpperCase())} placeholder="GHY-XXXXXX" style={{ ...inputStyle, marginBottom: 8, fontFamily: "'IBM Plex Mono', monospace", textAlign: "center", letterSpacing: 1 }} />
@@ -3796,6 +3954,15 @@ function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, on
           <div className="p-3 rounded-xl" style={{ background: C.rustLight }}>
             <p className="text-xs font-semibold flex items-center gap-1" style={{ color: C.rust }}><AlertOctagon size={13} />{label(DISPUTE_REASONS.find((d) => d.id === order.dispute.reason), lang)}</p>
             <p dir="auto" className="text-xs mt-1" style={{ color: C.asphalt, unicodeBidi: "plaintext" }}>{order.dispute.description}</p>
+            {order.dispute.images?.length > 0 && (
+              <div className="flex gap-2 mt-2 overflow-x-auto">
+                {order.dispute.images.map((img, i) => (
+                  <a key={img.id || i} href={img.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border" style={{ borderColor: C.line }}>
+                    <img src={img.thumbnailUrl || img.url} alt="" className="w-full h-full object-cover" />
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -3858,10 +4025,11 @@ function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, on
   );
 }
 
-function DisputeModal({ onClose, onSubmit }) {
+function DisputeModal({ session, onClose, onSubmit }) {
   const { t, lang } = useLang();
   const [reason, setReason] = useState(DISPUTE_REASONS[0].id);
   const [description, setDescription] = useState("");
+  const [images, setImages] = useState([]);
 
   return (
     <Modal title={t("disputeTitle")} onClose={onClose}>
@@ -3873,7 +4041,10 @@ function DisputeModal({ onClose, onSubmit }) {
       <Field label={t("disputeDescLabel")}>
         <textarea dir="auto" style={{ ...inputStyle, minHeight: 80 }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("disputeDescPlaceholder")} />
       </Field>
-      <PrimaryButton full disabled={!description.trim()} icon={Flag} onClick={() => onSubmit({ reason, description })}>{t("submitDisputeBtn")}</PrimaryButton>
+      <Field label={t("disputeEvidenceLabel")}>
+        <ImageUploader images={images} onChange={setImages} purpose="dispute" session={session} maxImages={6} />
+      </Field>
+      <PrimaryButton full disabled={!description.trim()} icon={Flag} onClick={() => onSubmit({ reason, description, images: images.map((i) => ({ id: i.id, url: i.url, thumbnailUrl: i.thumbnailUrl })) })}>{t("submitDisputeBtn")}</PrimaryButton>
     </Modal>
   );
 }
@@ -4754,7 +4925,7 @@ function BoostModal({ onClose, onBoost }) {
 /* ---------------------------------------------------------------------
    ADMIN / OWNER DASHBOARD
 --------------------------------------------------------------------- */
-function AdminScreen({ listings, revenue, session, pendingListings, adminShops, adminSettlements, adminRefunds, adminBankTransfers, onModerate, onVerify, onRemove, onDeleteShop, onExit, onMarkCommissionSettled, onUpdateRefundStatus, onVerifyBankConfirmation }) {
+function AdminScreen({ listings, revenue, session, pendingListings, adminShops, adminSettlements, adminRefunds, adminBankTransfers, onModerate, onVerify, onRemove, onDeleteShop, onExit, onMarkCommissionSettled, onUpdateRefundStatus, onVerifyBankConfirmation, onUpdateSellerStatus }) {
   const { t, lang } = useLang();
   const [tab, setTab] = useState("overview");
   const activeListings = listings.filter((l) => l.status === "active");
@@ -4817,6 +4988,7 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
     return t("listingDeletedToast");
   }
   const [confirmAction, setConfirmAction] = useState(null); // { message, onConfirm }
+  const [suspendTarget, setSuspendTarget] = useState(null); // { type, id, name }
 
   return (
     <div style={{ background: C.sandLight, minHeight: "100vh" }}>
@@ -4994,9 +5166,11 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
                   <div className="min-w-0">
                     <p dir="auto" className="text-sm font-semibold truncate" style={{ color: C.asphalt, unicodeBidi: "plaintext" }}>{l.title}</p>
                     <p className="text-xs flex items-center gap-2 mt-0.5" style={{ color: C.steel }}><span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{l.id}</span> · {label(findCity(l.city), lang)} · <Badge tone={l.status === "active" ? "green" : l.status === "sold" ? "rust" : "neutral"}>{t("status" + l.status.charAt(0).toUpperCase() + l.status.slice(1))}</Badge></p>
+                    <p className="text-xs mt-0.5" style={{ color: C.steel }}>{l.sellerName}</p>
                   </div>
                   <div className="flex gap-1.5 flex-shrink-0">
                     {l.status === "active" && <button onClick={() => onRemove(l.id)} className="p-2 rounded-lg" style={{ background: C.amberLight }} title={t("removeListingBtn")}><EyeOff size={14} color={C.amberDark} /></button>}
+                    <button onClick={() => setSuspendTarget({ type: "individual", id: l.sellerId, name: l.sellerName })} className="p-2 rounded-lg" style={{ background: C.amberLight }} title={t("suspendSellerBtn")}><Ban size={14} color={C.amberDark} /></button>
                     <button onClick={() => setConfirmAction({ message: t("confirmDeleteListing"), run: () => handleDeleteListing(l.id) })} className="p-2 rounded-lg" style={{ background: C.rustLight }} title={t("deletePermanentlyBtn")}><Trash2 size={14} color={C.rust} /></button>
                   </div>
                 </div>
@@ -5015,9 +5189,14 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
                     <p className="text-sm font-semibold flex items-center gap-1" style={{ color: C.asphalt }}>{s.name} {s.verified && <BadgeCheck size={13} color={C.green} />}</p>
                     <Badge tone="amber">{lang === "ar" ? FEES.tiers[s.tier].nameAr : FEES.tiers[s.tier].name}</Badge>
                   </div>
-                  <p className="text-xs mt-1" style={{ color: C.steel }}>{s.ownerName} · {label(findCity(s.city), lang)} · {s.listingCount} {t("listingsCount")} · <Badge tone={s.status === "approved" ? "green" : "amber"}>{s.status}</Badge></p>
-                  <div className="flex gap-1.5 mt-2">
-                    {s.status !== "approved" && <button onClick={() => onVerify(s.id)} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.greenLight, color: C.green }}>{t("verifyShop")}</button>}
+                  <p className="text-xs mt-1" style={{ color: C.steel }}>{s.ownerName} · {label(findCity(s.city), lang)} · {s.listingCount} {t("listingsCount")} · <Badge tone={s.status === "approved" ? "green" : s.status === "banned" ? "rust" : "amber"}>{t("sellerStatus" + s.status.charAt(0).toUpperCase() + s.status.slice(1))}</Badge></p>
+                  {s.status === "suspended" && s.statusReason && (
+                    <p dir="auto" className="text-xs mt-1 flex items-start gap-1" style={{ color: C.rust, unicodeBidi: "plaintext" }}><AlertTriangle size={12} className="mt-0.5 flex-shrink-0" />{s.statusReason}{s.suspendedUntil ? ` · ${t("untilLabel")} ${new Date(s.suspendedUntil).toLocaleDateString()}` : ` · ${t("permanentSuspension")}`}</p>
+                  )}
+                  <div className="flex gap-1.5 mt-2 flex-wrap">
+                    {s.status !== "approved" && s.status !== "suspended" && s.status !== "banned" && <button onClick={() => onVerify(s.id)} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.greenLight, color: C.green }}>{t("verifyShop")}</button>}
+                    {["approved", "pending"].includes(s.status) && <button onClick={() => setSuspendTarget({ type: "shop", id: s.id, name: s.name })} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.amberLight, color: C.amberDark }}>{t("suspendBtn")}</button>}
+                    {["suspended", "banned"].includes(s.status) && <button onClick={() => onUpdateSellerStatus("shop", s.id, "approved", null, null)} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.greenLight, color: C.green }}>{t("reinstateBtn")}</button>}
                     <button onClick={() => setConfirmAction({ message: t("confirmDeleteShop"), run: async () => { await onDeleteShop(s.id); return t("shopDeletedToast"); } })} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.rustLight, color: C.rust }}>{t("deletePermanentlyBtn")}</button>
                   </div>
                 </div>
@@ -5095,6 +5274,13 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
       </div>
       {confirmAction && (
         <ConfirmActionModal message={confirmAction.message} run={confirmAction.run} onClose={() => setConfirmAction(null)} />
+      )}
+      {suspendTarget && (
+        <SuspendModal
+          title={t("suspendModalTitle", { name: suspendTarget.name })}
+          onClose={() => setSuspendTarget(null)}
+          onSubmit={(reason, suspendedUntil) => onUpdateSellerStatus(suspendTarget.type, suspendTarget.id, "suspended", reason, suspendedUntil)}
+        />
       )}
     </div>
   );
