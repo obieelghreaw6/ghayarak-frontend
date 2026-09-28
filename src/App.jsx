@@ -104,6 +104,15 @@ const T = {
     noMatchTitle: "No parts match yet",
     noMatchSub: "Try another category, city, or search term.",
     back: "Back",
+    impactTitle: "This month on Ghayarak", impactEnquiries: "Enquiries", impactOffers: "Offers sent", impactReservations: "Reservations",
+    impactSales: "Completed sales", impactSalesValue: "Sales value", impactCommission: "Commission",
+    impactSummary: "Ghayarak commission of {commission} on {value} in sales this month.",
+    impactEmpty: "Your first completed sale this month will show up here.",
+    demandIntelTitle: "Demand intelligence", statMatchRate: "Match rate", statMatchedOf: "{m} matched of {n} requests",
+    statMatchToCompleted: "Matched → completed", statCompletedOf: "{c} completed of {n} orders",
+    statAvgTimeToMatch: "Avg time to match", statAvgAcceptedPrice: "Avg accepted price",
+    unmatchedMakesTitle: "Most unmatched vehicle makes", unmatchedCitiesTitle: "Cities with unmet demand",
+    tierTrusted: "Trusted seller", tierHighPerforming: "High-performing",
     sellerStatusApproved: "Active", sellerStatusSuspended: "Suspended", sellerStatusBanned: "Banned", sellerStatusPending: "Pending",
     untilLabel: "until", suspendBtn: "Suspend", reinstateBtn: "Reinstate", suspendSellerBtn: "Suspend seller",
     suspensionReasonLabel: "Reason (required, kept on record)", suspensionReasonPlaceholder: "Why is this account being suspended?",
@@ -529,6 +538,15 @@ const T = {
     noMatchTitle: "لا توجد قطع مطابقة بعد",
     noMatchSub: "جرّب قسمًا آخر، مدينة أخرى، أو كلمة بحث مختلفة.",
     back: "رجوع",
+    impactTitle: "هذا الشهر على غيارك", impactEnquiries: "استفسارات", impactOffers: "عروض مرسلة", impactReservations: "حجوزات",
+    impactSales: "مبيعات مكتملة", impactSalesValue: "قيمة المبيعات", impactCommission: "العمولة",
+    impactSummary: "عمولة غيارك {commission} على مبيعات بقيمة {value} هذا الشهر.",
+    impactEmpty: "أول عملية بيع مكتملة هذا الشهر ستظهر هنا.",
+    demandIntelTitle: "تحليل الطلب", statMatchRate: "نسبة الإيجاد", statMatchedOf: "{m} تم إيجادها من {n} طلب",
+    statMatchToCompleted: "من الإيجاد إلى الإتمام", statCompletedOf: "{c} مكتمل من {n} طلب",
+    statAvgTimeToMatch: "متوسط وقت الإيجاد", statAvgAcceptedPrice: "متوسط السعر المقبول",
+    unmatchedMakesTitle: "أكثر الماركات بدون نتيجة", unmatchedCitiesTitle: "مدن بطلب غير ملبّى",
+    tierTrusted: "بائع موثوق", tierHighPerforming: "أداء عالٍ",
     sellerStatusApproved: "نشط", sellerStatusSuspended: "موقوف", sellerStatusBanned: "محظور", sellerStatusPending: "قيد الانتظار",
     untilLabel: "حتى", suspendBtn: "إيقاف", reinstateBtn: "إعادة تفعيل", suspendSellerBtn: "إيقاف البائع",
     suspensionReasonLabel: "السبب (مطلوب، يُحفظ في السجل)", suspensionReasonPlaceholder: "لماذا يتم إيقاف هذا الحساب؟",
@@ -1125,12 +1143,14 @@ const adminApi = {
   getOverview: (token) => apiRequest("/admin/overview", { headers: { Authorization: `Bearer ${token}` } }),
   getRevenueChart: (days, token) => apiRequest(`/admin/revenue-chart?days=${days}`, { headers: { Authorization: `Bearer ${token}` } }),
   getHealth: (token) => apiRequest("/admin/health", { headers: { Authorization: `Bearer ${token}` } }),
+  getDemandIntel: (token) => apiRequest("/admin/demand-intel", { headers: { Authorization: `Bearer ${token}` } }),
 };
 
 const ordersApi = {
   list: (role, token) => apiRequest(`/orders?role=${role}`, { headers: { Authorization: `Bearer ${token}` } }),
   get: (id, token) => apiRequest(`/orders/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
   getSellerStats: (sellerId) => apiRequest(`/orders/seller-stats/${sellerId}`),
+  getMyImpact: (token) => apiRequest("/orders/my-impact", { headers: { Authorization: `Bearer ${token}` } }),
   create: (body, token) => apiRequest("/orders", { method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
   accept: (id, token) => apiRequest(`/orders/${id}/accept`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
   confirmSourced: (id, token) => apiRequest(`/orders/${id}/confirm-sourced`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
@@ -3071,6 +3091,9 @@ function ShopProfileScreen({ shop, listings, orders, onBack, onOpen }) {
           {stats?.completionRate !== null && stats?.completionRate !== undefined && (
             <span className="text-sm font-bold flex items-center gap-1" style={{ color: "#fff" }}><CheckCircle2 size={13} color={C.green} />{stats.completionRate}% {t("completionRateLabel")}</span>
           )}
+          {stats?.tier && (
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.green, color: "#fff" }}>{t(stats.tier === "high_performing" ? "tierHighPerforming" : "tierTrusted")}</span>
+          )}
           {stats && <span className="text-xs" style={{ color: C.steelLight }}>{t("salesCountLabel", { n: stats.completedTransactions.toLocaleString() })}</span>}
           {stats?.averageResponseHours !== null && stats?.averageResponseHours !== undefined && (
             <span className="text-xs flex items-center gap-1" style={{ color: C.steelLight }}><Clock size={11} />{t("avgResponseLabel", { n: stats.averageResponseHours })}</span>
@@ -4141,6 +4164,19 @@ function SellerCenterScreen({ session, myShop, myListings, mySales, matchingRequ
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   const [tab, setTab] = useState("dashboard");
 
+  // Real numbers for this month, fetched fresh whenever Seller Center
+  // opens — never derived from cached lists, so it can't drift.
+  const [impact, setImpact] = useState(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        setImpact(await ordersApi.getMyImpact(session.token));
+      } catch (e) {
+        console.error("Could not load seller impact.", e);
+      }
+    })();
+  }, [session.token]);
+
   const activeListings = myListings.filter((l) => l.status === "active");
   const totalViews = myListings.reduce((sum, l) => sum + (l.views || 0), 0);
   const totalSaves = myListings.reduce((sum, l) => sum + (l.saves || 0), 0);
@@ -4185,6 +4221,32 @@ function SellerCenterScreen({ session, myShop, myListings, mySales, matchingRequ
         </div>
         {dir === "rtl" ? <ChevronLeft size={16} color={C.amberDark} /> : <ChevronRight size={16} color={C.amberDark} />}
       </button>
+
+      {impact && (
+        <div className="mx-4 mb-3 p-4 rounded-2xl border" style={{ background: "#fff", borderColor: C.line }}>
+          <p className="text-xs font-bold uppercase mb-3" style={{ color: C.steel, letterSpacing: 0.5 }}>{t("impactTitle")}</p>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { k: "impactEnquiries", v: impact.enquiries },
+              { k: "impactOffers", v: impact.offersSubmitted },
+              { k: "impactReservations", v: impact.reservations },
+              { k: "impactSales", v: impact.completedSales },
+              { k: "impactSalesValue", v: `${impact.salesValue.toLocaleString()} ${cur}` },
+              { k: "impactCommission", v: `${impact.commission.toLocaleString()} ${cur}` },
+            ].map((x) => (
+              <div key={x.k} className="p-2 rounded-lg text-center" style={{ background: C.sand }}>
+                <p className="text-sm font-bold" style={{ color: C.asphalt, fontFamily: "'IBM Plex Mono', monospace" }}>{x.v}</p>
+                <p className="text-[10px] mt-0.5" style={{ color: C.steel }}>{t(x.k)}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs mt-3" style={{ color: C.steel }}>
+            {impact.completedSales > 0
+              ? t("impactSummary", { commission: `${impact.commission.toLocaleString()} ${cur}`, value: `${impact.salesValue.toLocaleString()} ${cur}` })
+              : t("impactEmpty")}
+          </p>
+        </div>
+      )}
 
       <div className="flex px-4 gap-1 border-b" style={{ borderColor: C.line }}>
         {[{ id: "dashboard", label: t("dashboardTab") }, { id: "inventory", label: t("inventoryTab") }, { id: "financials", label: t("financialsTab") }, { id: "matching", label: t("matchingTab") }].map((tb) => (
@@ -4952,6 +5014,20 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
     })();
   }, [tab, session.token]);
 
+  // Fetched separately from the main overview on purpose: if this one
+  // query ever fails, the rest of the Overview should still load.
+  const [demandIntel, setDemandIntel] = useState(null);
+  useEffect(() => {
+    if (tab !== "overview") return;
+    (async () => {
+      try {
+        setDemandIntel(await adminApi.getDemandIntel(session.token));
+      } catch (e) {
+        console.error("Could not load demand intelligence.", e);
+      }
+    })();
+  }, [tab, session.token]);
+
   const [revenueChart, setRevenueChart] = useState(null);
   const [revenueDays, setRevenueDays] = useState(30);
   useEffect(() => {
@@ -5070,6 +5146,34 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
                 <StatCard icon={AlertOctagon} label={t("statOpenDisputes")} value={overview.operations.openDisputes} />
                 <StatCard icon={AlertTriangle} label={t("statFailedPayments")} value={overview.operations.failedPayments} />
               </div>
+
+              {demandIntel && (
+                <div className="mt-5 p-4 rounded-xl border" style={{ background: "#fff", borderColor: C.line }}>
+                  <p className="text-xs font-bold uppercase mb-3" style={{ color: C.steel, letterSpacing: 0.5 }}>{t("demandIntelTitle")}</p>
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <StatCard icon={CheckCircle2} label={t("statMatchRate")} value={demandIntel.matchRate !== null ? `${demandIntel.matchRate}%` : t("statNoData")} sub={t("statMatchedOf", { m: demandIntel.matchedRequests, n: demandIntel.totalRequests })} highlight />
+                    <StatCard icon={Package} label={t("statMatchToCompleted")} value={demandIntel.matchToCompletedRate !== null ? `${demandIntel.matchToCompletedRate}%` : t("statNoData")} sub={t("statCompletedOf", { c: demandIntel.completedFromRequests, n: demandIntel.ordersFromRequests })} />
+                    <StatCard icon={Clock} label={t("statAvgTimeToMatch")} value={demandIntel.averageHoursToMatch !== null ? t("statHours", { n: demandIntel.averageHoursToMatch }) : t("statNoData")} />
+                    <StatCard icon={CircleDollarSign} label={t("statAvgAcceptedPrice")} value={`${demandIntel.averageAcceptedPrice.toLocaleString()} LYD`} />
+                  </div>
+                  {demandIntel.topUnmatchedMakes.length > 0 && (
+                    <>
+                      <p className="text-xs font-semibold mb-1.5" style={{ color: C.steel }}>{t("unmatchedMakesTitle")}</p>
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {demandIntel.topUnmatchedMakes.map((m) => <span key={m.label} className="text-xs px-2 py-1 rounded-full" style={{ background: C.rustLight, color: C.rust }}>{m.label} · {m.count}</span>)}
+                      </div>
+                    </>
+                  )}
+                  {demandIntel.topUnmatchedCities.length > 0 && (
+                    <>
+                      <p className="text-xs font-semibold mb-1.5" style={{ color: C.steel }}>{t("unmatchedCitiesTitle")}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {demandIntel.topUnmatchedCities.map((c) => <span key={c.label} className="text-xs px-2 py-1 rounded-full" style={{ background: C.rustLight, color: C.rust }}>{findCity(c.label) ? label(findCity(c.label), lang) : c.label} · {c.count}</span>)}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {health && (
                 <div className="mt-5 p-4 rounded-xl border" style={{ background: "#fff", borderColor: C.line }}>
