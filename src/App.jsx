@@ -104,6 +104,7 @@ const T = {
     noMatchTitle: "No parts match yet",
     noMatchSub: "Try another category, city, or search term.",
     back: "Back",
+    sellerProfileLoadError: "Could not load this seller.", memberSinceLabel: "Member since {date}",
     reviewSellerTitle: "Rate this seller", reviewBuyerTitle: "Rate this buyer", overallRatingLabel: "Overall",
     subRating_accuracy: "Part accuracy", subRating_condition: "Condition as described", subRating_communication: "Communication",
     subRating_speed: "Speed", subRating_payment: "Paid reliably", subRating_pickup: "Picked up on time",
@@ -544,6 +545,7 @@ const T = {
     noMatchTitle: "لا توجد قطع مطابقة بعد",
     noMatchSub: "جرّب قسمًا آخر، مدينة أخرى، أو كلمة بحث مختلفة.",
     back: "رجوع",
+    sellerProfileLoadError: "تعذّر تحميل هذا البائع.", memberSinceLabel: "عضو منذ {date}",
     reviewSellerTitle: "قيّم هذا البائع", reviewBuyerTitle: "قيّم هذا المشتري", overallRatingLabel: "التقييم العام",
     subRating_accuracy: "دقة القطعة", subRating_condition: "الحالة كما وُصفت", subRating_communication: "التواصل",
     subRating_speed: "السرعة", subRating_payment: "الدفع بموثوقية", subRating_pickup: "الاستلام في الوقت",
@@ -1165,6 +1167,7 @@ const ordersApi = {
   getMyImpact: (token) => apiRequest("/orders/my-impact", { headers: { Authorization: `Bearer ${token}` } }),
   submitReview: (orderId, body, token) => apiRequest(`/orders/${orderId}/review`, { method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
   getReviews: (userId) => apiRequest(`/orders/reviews/${userId}`),
+  getSellerProfile: (userId) => apiRequest(`/orders/seller-profile/${userId}`),
   create: (body, token) => apiRequest("/orders", { method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
   accept: (id, token) => apiRequest(`/orders/${id}/accept`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
   confirmSourced: (id, token) => apiRequest(`/orders/${id}/confirm-sourced`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
@@ -1676,6 +1679,7 @@ function AppInner() {
   const [activeRequest, setActiveRequest] = useState(null);
   const [activeOrder, setActiveOrder] = useState(null);
   const [activeShopId, setActiveShopId] = useState(null);
+  const [activeSellerId, setActiveSellerId] = useState(null);
   const [showThreadMessage, setShowThreadMessage] = useState(null);
   const [showRedeemCode, setShowRedeemCode] = useState(false);
   const [showThreadConversations, setShowThreadConversations] = useState(null);
@@ -2532,6 +2536,11 @@ function AppInner() {
               onBack={() => setScreen(query.trim() ? "search" : "home")}
               onOpen={(l) => { setActiveListing(l); setScreen("listing"); }} />
           )}
+          {screen === "sellerProfile" && activeSellerId && (
+            <SellerProfileScreen sellerId={activeSellerId}
+              onBack={() => setScreen(query.trim() ? "search" : "home")}
+              onOpen={(l) => { setActiveListing(l); setScreen("listing"); }} />
+          )}
           {screen === "seller" && session && (
             <SellerCenterScreen session={session} myShop={myShop} myListings={myListingsAll}
               mySales={orders.filter((o) => o.sellerContact === session.contact)}
@@ -2553,6 +2562,7 @@ function AppInner() {
               onMarkSold={() => handleMarkSold(activeListing.id)}
               isOwner={session && activeListing.sellerId === session.id}
               onOpenShop={(id) => { setActiveShopId(id); setScreen("shop"); }}
+              onOpenSellerProfile={(id) => { setActiveSellerId(id); setScreen("sellerProfile"); }}
               isFavorite={favoriteIds.includes(activeListing.id)}
               onToggleFavorite={() => requireLogin(() => toggleFavorite(activeListing.id))}
               onMessageSeller={() => requireLogin(() => setShowThreadMessage({ scope: "listing", scopeId: activeListing.id }))}
@@ -3186,7 +3196,105 @@ function ShopProfileScreen({ shop, listings, orders, onBack, onOpen }) {
   );
 }
 
-function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isOwner, onOpenShop, isFavorite, onToggleFavorite, onMessageSeller, onViewConversations, onRemoveListing }) {
+// The individual-seller equivalent of ShopProfileScreen — self-contained,
+// fetching its own profile and listings rather than relying on data
+// already loaded elsewhere, since a seller's own page can be opened from
+// anywhere a listing shows their name. Deliberately no "Verified" badge:
+// that's an admin-reviewed check shops go through that individuals don't
+// have yet, so showing one here would claim something that isn't true.
+function SellerProfileScreen({ sellerId, onBack, onOpen }) {
+  const { t, lang, dir } = useLang();
+  const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
+  const [profile, setProfile] = useState(null);
+  const [sellerListings, setSellerListings] = useState([]);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [p, l] = await Promise.all([
+          ordersApi.getSellerProfile(sellerId),
+          listingsApi.list({ sellerId }),
+        ]);
+        setProfile(p);
+        setSellerListings((l.listings || []).map(mapApiListing));
+      } catch (e) {
+        console.error("Could not load seller profile.", e);
+        setLoadError(true);
+      }
+    })();
+  }, [sellerId]);
+
+  return (
+    <div>
+      <div className="px-4 pt-3">
+        <button onClick={onBack} className="flex items-center gap-1 text-sm font-semibold mb-3" style={{ color: C.steel }}><BackIcon size={15} /> {t("back")}</button>
+      </div>
+      {loadError ? (
+        <p className="text-sm py-10 text-center" style={{ color: C.rust }}>{t("sellerProfileLoadError")}</p>
+      ) : !profile ? (
+        <p className="text-sm py-10 text-center" style={{ color: C.steel }}>{t("loading")}</p>
+      ) : (
+        <>
+          <div className="mx-4 rounded-2xl p-5" style={{ background: `linear-gradient(135deg, ${C.asphalt}, ${C.asphalt2})` }}>
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: `linear-gradient(155deg, ${C.steel}, ${C.asphalt3})` }}>
+                <User size={26} color="#fff" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p dir="auto" className="text-lg font-bold" style={{ color: "#fff", unicodeBidi: "plaintext" }}>{profile.name}</p>
+                <p className="text-xs mt-0.5" style={{ color: C.steelLight }}>{t("memberSinceLabel", { date: new Date(profile.memberSince).toLocaleDateString() })}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 mt-4 pt-4 flex-wrap" style={{ borderTop: "1px solid rgba(255,255,255,0.12)" }}>
+              {profile.totalReviews > 0 && (
+                <span className="text-sm font-bold flex items-center gap-1" style={{ color: "#fff" }}><Star size={13} color={C.amber} fill={C.amber} />{profile.averageRating} <span className="font-normal" style={{ color: C.steelLight }}>({profile.totalReviews})</span></span>
+              )}
+              {profile.completionRate !== null && (
+                <span className="text-sm font-bold flex items-center gap-1" style={{ color: "#fff" }}><CheckCircle2 size={13} color={C.green} />{profile.completionRate}% {t("completionRateLabel")}</span>
+              )}
+              {profile.tier && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: C.green, color: "#fff" }}>{t(profile.tier === "high_performing" ? "tierHighPerforming" : "tierTrusted")}</span>
+              )}
+              <span className="text-xs" style={{ color: C.steelLight }}>{t("salesCountLabel", { n: profile.completedTransactions.toLocaleString() })}</span>
+              {profile.averageResponseHours !== null && (
+                <span className="text-xs flex items-center gap-1" style={{ color: C.steelLight }}><Clock size={11} />{t("avgResponseLabel", { n: profile.averageResponseHours })}</span>
+              )}
+            </div>
+          </div>
+
+          {profile.reviews.length > 0 && (
+            <div className="px-4 mt-5">
+              <p className="text-xs font-bold uppercase mb-2" style={{ color: C.steel, letterSpacing: 0.5 }}>{t("reviewsTitle", { n: profile.totalReviews })}</p>
+              <div className="space-y-2">
+                {profile.reviews.slice(0, 5).map((r) => (
+                  <div key={r.id} className="p-3 rounded-xl border" style={{ borderColor: C.line, background: "#fff" }}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold" style={{ color: C.asphalt }}>{r.reviewer_name}</span>
+                      <span className="text-xs font-bold flex items-center gap-1" style={{ color: C.amberDark }}><Star size={11} color={C.amber} fill={C.amber} />{r.overall_rating}</span>
+                    </div>
+                    {r.comment && <p dir="auto" className="text-xs mt-1" style={{ color: C.steel, unicodeBidi: "plaintext" }}>{r.comment}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className="px-4 mt-5 mb-2 text-xs font-bold uppercase" style={{ color: C.steel, letterSpacing: 0.5 }}>{t("shopListingsCount", { n: sellerListings.length })}</p>
+          <div className="px-4">
+            {sellerListings.length === 0 ? (
+              <p className="text-sm py-8 text-center" style={{ color: C.steel }}>{t("noMatchTitle")}</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">{sellerListings.map((l) => <ListingCard key={l.id} listing={l} shops={[]} onOpen={onOpen} />)}</div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isOwner, onOpenShop, onOpenSellerProfile, isFavorite, onToggleFavorite, onMessageSeller, onViewConversations, onRemoveListing }) {
   const { t, lang, dir } = useLang();
   const Icon = CAT_ICON[listing.category] || Package;
   const shop = listing.shopId ? shops.find((s) => s.id === listing.shopId) : null;
@@ -3261,7 +3369,7 @@ function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isO
           <p className="text-xs font-semibold mb-1" style={{ color: C.steel, letterSpacing: 0.3 }}>{t("descriptionLabel")}</p>
           <p className="text-sm" style={{ color: C.asphalt }}>{listing.description}</p>
         </div>
-        <button onClick={() => shop && onOpenShop(shop.id)} disabled={!shop} className="mt-3 p-3 rounded-xl border flex items-center gap-3 w-full text-left" style={{ borderColor: C.line, background: "#fff" }}>
+        <button onClick={() => (shop ? onOpenShop(shop.id) : onOpenSellerProfile(listing.sellerId))} className="mt-3 p-3 rounded-xl border flex items-center gap-3 w-full text-left" style={{ borderColor: C.line, background: "#fff" }}>
           <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: shop ? C.amberLight : C.sand }}>
             {shop ? <Store size={18} color={C.amberDark} /> : <User size={18} color={C.steel} />}
           </div>
@@ -3273,7 +3381,7 @@ function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isO
               ) : t("individual")}
             </p>
           </div>
-          {shop && <ChevronRight size={16} color={C.steel} style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />}
+          <ChevronRight size={16} color={C.steel} style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />
         </button>
         {listing.protectedDeal && (
           <div className="mt-3 p-3 rounded-xl" style={{ background: C.greenLight }}>
