@@ -104,6 +104,7 @@ const T = {
     noMatchTitle: "No parts match yet",
     noMatchSub: "Try another category, city, or search term.",
     back: "Back",
+    shopCoverField: "Cover photo", shopLogoField: "Logo", shopUpdatedToast: "Shop updated.",
     reportListingTitle: "Report this listing", reportReasonLabel: "Reason", reportDescLabel: "Details (optional)",
     reportDescPlaceholder: "What's wrong with this listing?", submitReportBtn: "Submit Report", reportListingBtn: "Report this listing",
     reportSubmittedToast: "Report submitted — thank you.", reportsAdminTab: "Reports", reportedByLabel: "Reported by {name}",
@@ -550,6 +551,7 @@ const T = {
     noMatchTitle: "لا توجد قطع مطابقة بعد",
     noMatchSub: "جرّب قسمًا آخر، مدينة أخرى، أو كلمة بحث مختلفة.",
     back: "رجوع",
+    shopCoverField: "صورة الغلاف", shopLogoField: "الشعار", shopUpdatedToast: "تم تحديث المحل.",
     reportListingTitle: "الإبلاغ عن هذا الإعلان", reportReasonLabel: "السبب", reportDescLabel: "التفاصيل (اختياري)",
     reportDescPlaceholder: "ما المشكلة في هذا الإعلان؟", submitReportBtn: "إرسال البلاغ", reportListingBtn: "الإبلاغ عن هذا الإعلان",
     reportSubmittedToast: "تم إرسال البلاغ — شكرًا لك.", reportsAdminTab: "البلاغات", reportedByLabel: "أبلغ عنه {name}",
@@ -1201,6 +1203,7 @@ const shopsApi = {
   getMine: (token) => apiRequest("/shops/mine", { headers: { Authorization: `Bearer ${token}` } }),
   get: (id) => apiRequest(`/shops/${id}`),
   create: (body, token) => apiRequest("/shops", { method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
+  update: (id, body, token) => apiRequest(`/shops/${id}`, { method: "PATCH", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
 };
 
 const financeApi = {
@@ -1319,6 +1322,8 @@ function mapApiShop(s) {
     address: s.address,
     openingHours: s.opening_hours,
     deliveryAvailable: s.delivery_available,
+    logoUrl: s.logo_url,
+    coverUrl: s.cover_url,
     subscriptionExpiry: s.subscription_expiry ? new Date(s.subscription_expiry).getTime() : null,
     createdAt: s.created_at ? new Date(s.created_at).getTime() : Date.now(),
     status: s.status,
@@ -2212,9 +2217,16 @@ function AppInner() {
     }
   }
   async function handleUpdateShop(shopId, form) {
-    await persistShops(shops.map((s) => (s.id === shopId ? { ...s, ...form } : s)));
-    flash(t("listingUpdatedToast"));
-    setShowEditShop(false);
+    try {
+      const { shop } = await shopsApi.update(shopId, form, session.token);
+      const mapped = mapApiShop(shop);
+      setShops(shops.map((s) => (s.id === shopId ? { ...s, ...mapped } : s)));
+      if (myShop?.id === shopId) setMyShop((prev) => ({ ...prev, ...mapped }));
+      flash(t("shopUpdatedToast"));
+      setShowEditShop(false);
+    } catch (e) {
+      flash(e.message);
+    }
   }
 
   // Opening a request from a list always fetches its real detail first —
@@ -2682,7 +2694,7 @@ function AppInner() {
         }} />}
         {showPost && session && <PostListingModal onClose={() => setShowPost(false)} onSubmit={handlePostListing} isShop={!!myShop} session={session} />}
         {editingListing && <EditListingModal listing={editingListing} session={session} onClose={() => setEditingListing(null)} onSubmit={handleUpdateListing} />}
-        {showEditShop && myShop && <EditShopModal shop={myShop} onClose={() => setShowEditShop(false)} onSubmit={(form) => handleUpdateShop(myShop.id, form)} />}
+        {showEditShop && myShop && <EditShopModal shop={myShop} session={session} onClose={() => setShowEditShop(false)} onSubmit={(form) => handleUpdateShop(myShop.id, form)} />}
         {showPostChoice && (
           <PostChoiceModal onClose={() => setShowPostChoice(false)}
             onSell={() => { setShowPostChoice(false); setShowPost(true); }}
@@ -3175,10 +3187,14 @@ function ShopProfileScreen({ shop, listings, orders, onBack, onOpen }) {
       <div className="px-4 pt-3">
         <button onClick={onBack} className="flex items-center gap-1 text-sm font-semibold mb-3" style={{ color: C.steel }}><BackIcon size={15} /> {t("back")}</button>
       </div>
-      <div className="mx-4 rounded-2xl p-5" style={{ background: `linear-gradient(135deg, ${C.asphalt}, ${C.asphalt2})` }}>
+      <div className="mx-4 rounded-2xl p-5" style={{
+        background: shop.coverUrl
+          ? `linear-gradient(rgba(28,28,30,0.55), rgba(28,28,30,0.75)), url(${shop.coverUrl}) center/cover`
+          : `linear-gradient(135deg, ${C.asphalt}, ${C.asphalt2})`,
+      }}>
         <div className="flex items-center gap-3">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: `linear-gradient(155deg, ${C.amber}, ${C.amberDark})` }}>
-            <Store size={26} color="#fff" />
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ background: shop.logoUrl ? "#fff" : `linear-gradient(155deg, ${C.amber}, ${C.amberDark})` }}>
+            {shop.logoUrl ? <img src={shop.logoUrl} alt="" className="w-full h-full object-cover" /> : <Store size={26} color="#fff" />}
           </div>
           <div className="flex-1 min-w-0">
             <p dir="auto" className="text-lg font-bold flex items-center gap-1.5" style={{ color: "#fff", unicodeBidi: "plaintext" }}>{shop.name}{shop.verified && <BadgeCheck size={16} color={C.green} />}</p>
@@ -5083,7 +5099,7 @@ function ImageUploader({ images, onChange, purpose, session, maxImages = 10 }) {
         {images.map((img, i) => (
           <div key={img.id} className="relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border" style={{ borderColor: C.line }}>
             <img src={img.thumbnailUrl || img.url} alt="" className="w-full h-full object-cover" />
-            {i === 0 && <span className="absolute bottom-0 left-0 right-0 text-[9px] text-center py-0.5" style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}>{t("coverPhotoLabel")}</span>}
+            {i === 0 && maxImages > 1 && <span className="absolute bottom-0 left-0 right-0 text-[9px] text-center py-0.5" style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}>{t("coverPhotoLabel")}</span>}
             <button onClick={() => removeImage(img)} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}><X size={11} color="#fff" /></button>
             <div className="absolute top-0.5 left-0.5 flex gap-0.5">
               {i > 0 && <button onClick={() => moveImage(i, -1)} className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}><ChevronLeft size={11} color="#fff" /></button>}
@@ -5258,18 +5274,34 @@ function EditListingModal({ listing, session, onClose, onSubmit }) {
 /* ---------------------------------------------------------------------
    Edit shop modal — profile-only edits, never touches subscription/tier
 --------------------------------------------------------------------- */
-function EditShopModal({ shop, onClose, onSubmit }) {
+function EditShopModal({ shop, session, onClose, onSubmit }) {
   const { t, lang } = useLang();
   const [form, setForm] = useState({
     name: shop.name, city: shop.city, description: shop.description || "",
     whatsapp: shop.whatsapp || "", address: shop.address || "",
     openingHours: shop.openingHours || "", deliveryAvailable: !!shop.deliveryAvailable,
   });
+  const [logoImages, setLogoImages] = useState(shop.logoUrl ? [{ id: "existing", url: shop.logoUrl, thumbnailUrl: shop.logoUrl }] : []);
+  const [coverImages, setCoverImages] = useState(shop.coverUrl ? [{ id: "existing", url: shop.coverUrl, thumbnailUrl: shop.coverUrl }] : []);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const valid = form.name.trim();
 
+  function handleSubmit() {
+    onSubmit({
+      ...form,
+      logoUrl: logoImages[0]?.url || null,
+      coverUrl: coverImages[0]?.url || null,
+    });
+  }
+
   return (
     <Modal title={t("editShopBtn")} onClose={onClose} wide>
+      <Field label={t("shopCoverField")}>
+        <ImageUploader images={coverImages} onChange={setCoverImages} purpose="shop_cover" session={session} maxImages={1} />
+      </Field>
+      <Field label={t("shopLogoField")}>
+        <ImageUploader images={logoImages} onChange={setLogoImages} purpose="shop_logo" session={session} maxImages={1} />
+      </Field>
       <Field label={t("shopNameField")}><input style={inputStyle} value={form.name} onChange={(e) => set("name", e.target.value)} /></Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label={t("cityField")}><select style={inputStyle} value={form.city} onChange={(e) => set("city", e.target.value)}>{CITIES.map((c) => <option key={c.id} value={c.id}>{label(c, lang)}</option>)}</select></Field>
@@ -5281,7 +5313,7 @@ function EditShopModal({ shop, onClose, onSubmit }) {
       <label className="flex items-center gap-2 mb-4 text-sm" style={{ color: C.asphalt }}>
         <input type="checkbox" checked={form.deliveryAvailable} onChange={(e) => set("deliveryAvailable", e.target.checked)} /> {t("deliveryOnlyFilter")}
       </label>
-      <PrimaryButton full disabled={!valid} onClick={() => onSubmit(form)}>{t("updateListingBtn")}</PrimaryButton>
+      <PrimaryButton full disabled={!valid} onClick={handleSubmit}>{t("updateListingBtn")}</PrimaryButton>
     </Modal>
   );
 }
