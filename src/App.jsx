@@ -104,6 +104,12 @@ const T = {
     noMatchTitle: "No parts match yet",
     noMatchSub: "Try another category, city, or search term.",
     back: "Back",
+    reviewSellerTitle: "Rate this seller", reviewBuyerTitle: "Rate this buyer", overallRatingLabel: "Overall",
+    subRating_accuracy: "Part accuracy", subRating_condition: "Condition as described", subRating_communication: "Communication",
+    subRating_speed: "Speed", subRating_payment: "Paid reliably", subRating_pickup: "Picked up on time",
+    reviewCommentLabel: "Comment (optional)", reviewCommentPlaceholder: "How did it go?", submitReviewBtn: "Submit Review",
+    reviewSellerBtn: "Rate seller", reviewBuyerBtn: "Rate buyer", youReviewedNote: "You rated this {n}/5",
+    reviewSubmittedToast: "Review submitted.", reviewsTitle: "Reviews ({n})",
     impactTitle: "This month on Ghayarak", impactEnquiries: "Enquiries", impactOffers: "Offers sent", impactReservations: "Reservations",
     impactSales: "Completed sales", impactSalesValue: "Sales value", impactCommission: "Commission",
     impactSummary: "Ghayarak commission of {commission} on {value} in sales this month.",
@@ -538,6 +544,12 @@ const T = {
     noMatchTitle: "لا توجد قطع مطابقة بعد",
     noMatchSub: "جرّب قسمًا آخر، مدينة أخرى، أو كلمة بحث مختلفة.",
     back: "رجوع",
+    reviewSellerTitle: "قيّم هذا البائع", reviewBuyerTitle: "قيّم هذا المشتري", overallRatingLabel: "التقييم العام",
+    subRating_accuracy: "دقة القطعة", subRating_condition: "الحالة كما وُصفت", subRating_communication: "التواصل",
+    subRating_speed: "السرعة", subRating_payment: "الدفع بموثوقية", subRating_pickup: "الاستلام في الوقت",
+    reviewCommentLabel: "تعليق (اختياري)", reviewCommentPlaceholder: "كيف كانت التجربة؟", submitReviewBtn: "إرسال التقييم",
+    reviewSellerBtn: "قيّم البائع", reviewBuyerBtn: "قيّم المشتري", youReviewedNote: "قيّمت هذا {n}/5",
+    reviewSubmittedToast: "تم إرسال التقييم.", reviewsTitle: "التقييمات ({n})",
     impactTitle: "هذا الشهر على غيارك", impactEnquiries: "استفسارات", impactOffers: "عروض مرسلة", impactReservations: "حجوزات",
     impactSales: "مبيعات مكتملة", impactSalesValue: "قيمة المبيعات", impactCommission: "العمولة",
     impactSummary: "عمولة غيارك {commission} على مبيعات بقيمة {value} هذا الشهر.",
@@ -1151,6 +1163,8 @@ const ordersApi = {
   get: (id, token) => apiRequest(`/orders/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
   getSellerStats: (sellerId) => apiRequest(`/orders/seller-stats/${sellerId}`),
   getMyImpact: (token) => apiRequest("/orders/my-impact", { headers: { Authorization: `Bearer ${token}` } }),
+  submitReview: (orderId, body, token) => apiRequest(`/orders/${orderId}/review`, { method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
+  getReviews: (userId) => apiRequest(`/orders/reviews/${userId}`),
   create: (body, token) => apiRequest("/orders", { method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
   accept: (id, token) => apiRequest(`/orders/${id}/accept`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
   confirmSourced: (id, token) => apiRequest(`/orders/${id}/confirm-sourced`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
@@ -1314,6 +1328,11 @@ function mapApiOrder(o, extras = {}) {
   const latestRefund = extras.refunds?.[0];
   const latestBankConfirmation = extras.bankTransferConfirmations?.[0];
   const latestDispute = extras.disputes?.[0];
+  // Up to two rows — one per direction (buyer_on_seller, seller_on_buyer)
+  // — so both "have I reviewed them" and "have they reviewed me" can be
+  // read straight off the order without a second request.
+  const myReview = extras.reviews?.find((r) => r.reviewer_id === extras.myUserId);
+  const theirReview = extras.reviews?.find((r) => r.reviewer_id !== extras.myUserId);
   return {
     id: o.id,
     listingId: o.listing_id,
@@ -1346,6 +1365,10 @@ function mapApiOrder(o, extras = {}) {
     status: o.status,
     cancelledBy: o.cancelled_by,
     cancelReason: o.cancel_reason,
+    myReview: myReview ? { overallRating: myReview.overall_rating } : null,
+    theirReview: theirReview
+      ? { overallRating: theirReview.overall_rating, comment: theirReview.comment, reviewerName: theirReview.reviewer_name }
+      : null,
     createdAt: o.created_at ? new Date(o.created_at).getTime() : Date.now(),
     completedAt: o.completed_at,
     refund: latestRefund ? { status: latestRefund.status, amount: Number(latestRefund.amount), reason: latestRefund.reason } : null,
@@ -2253,8 +2276,8 @@ function AppInner() {
   // after every action, since the server is the actual source of truth
   // for status transitions now.
   async function refreshOrder(orderId) {
-    const { order, disputes, refunds, bankTransferConfirmations } = await ordersApi.get(orderId, session.token);
-    const mapped = mapApiOrder(order, { disputes, refunds, bankTransferConfirmations });
+    const { order, disputes, refunds, bankTransferConfirmations, reviews } = await ordersApi.get(orderId, session.token);
+    const mapped = mapApiOrder(order, { disputes, refunds, bankTransferConfirmations, reviews, myUserId: session.id });
     setActiveOrder(mapped);
     setOrders((prev) => (prev.some((o) => o.id === mapped.id) ? prev.map((o) => (o.id === mapped.id ? mapped : o)) : [mapped, ...prev]));
     return mapped;
@@ -2291,6 +2314,14 @@ function AppInner() {
   async function handleConfirmSourced(orderId) {
     try { await ordersApi.confirmSourced(orderId, session.token); await refreshOrder(orderId); flash(t("sourcingConfirmedToast")); }
     catch (e) { flash(e.message); }
+  }
+  // Deliberately does NOT catch its own errors — ReviewModal awaits this
+  // and shows the failure inline, keeping itself open so nothing typed
+  // is lost.
+  async function handleSubmitReview(orderId, form) {
+    await ordersApi.submitReview(orderId, form, session.token);
+    await refreshOrder(orderId);
+    flash(t("reviewSubmittedToast"));
   }
 
   // --- Fulfilment: accepted -> preparing -> (ready_for_pickup | out_for_delivery) -> (collected | delivered) -> completed ---
@@ -2558,7 +2589,8 @@ function AppInner() {
               onRequestRefund={() => setShowRefundRequest(activeOrder.id)}
               onSubmitBankConfirmation={(ref) => handleSubmitBankConfirmation(activeOrder.id, ref)}
               onRedeemCode={handleRedeemCode}
-              onConfirmSourced={handleConfirmSourced} />
+              onConfirmSourced={handleConfirmSourced}
+              onSubmitReview={handleSubmitReview} />
           )}
           {screen === "account" && (
             <AccountScreen session={session} myShop={myShop} listings={myListingsAll}
@@ -3069,6 +3101,20 @@ function ShopProfileScreen({ shop, listings, orders, onBack, onOpen }) {
     })();
   }, [shop?.ownerId]);
 
+  // Real reviews, not decorative — transaction-gated on the backend, so
+  // every one here came from an actual completed order.
+  const [reviewData, setReviewData] = useState(null);
+  useEffect(() => {
+    if (!shop?.ownerId) return;
+    (async () => {
+      try {
+        setReviewData(await ordersApi.getReviews(shop.ownerId));
+      } catch (e) {
+        console.error("Could not load reviews.", e);
+      }
+    })();
+  }, [shop?.ownerId]);
+
   if (!shop) return null;
   const city = findCity(shop.city);
   const biz = findBusinessType(shop.businessType);
@@ -3088,6 +3134,9 @@ function ShopProfileScreen({ shop, listings, orders, onBack, onOpen }) {
           </div>
         </div>
         <div className="flex items-center gap-4 mt-4 pt-4 flex-wrap" style={{ borderTop: "1px solid rgba(255,255,255,0.12)" }}>
+          {reviewData?.totalReviews > 0 && (
+            <span className="text-sm font-bold flex items-center gap-1" style={{ color: "#fff" }}><Star size={13} color={C.amber} fill={C.amber} />{reviewData.averageRating} <span className="font-normal" style={{ color: C.steelLight }}>({reviewData.totalReviews})</span></span>
+          )}
           {stats?.completionRate !== null && stats?.completionRate !== undefined && (
             <span className="text-sm font-bold flex items-center gap-1" style={{ color: "#fff" }}><CheckCircle2 size={13} color={C.green} />{stats.completionRate}% {t("completionRateLabel")}</span>
           )}
@@ -3109,6 +3158,22 @@ function ShopProfileScreen({ shop, listings, orders, onBack, onOpen }) {
         {shop.deliveryAvailable ? <Badge tone="amber" icon={Truck}>{t("deliveryAvailableLabel")}</Badge> : <Badge>{t("pickupOnlyLabel")}</Badge>}
       </div>
       {shop.description && <p dir="auto" className="mx-4 mt-3 text-sm" style={{ color: C.steel, unicodeBidi: "plaintext" }}>{shop.description}</p>}
+      {reviewData?.reviews?.length > 0 && (
+        <div className="px-4 mt-5">
+          <p className="text-xs font-bold uppercase mb-2" style={{ color: C.steel, letterSpacing: 0.5 }}>{t("reviewsTitle", { n: reviewData.totalReviews })}</p>
+          <div className="space-y-2">
+            {reviewData.reviews.slice(0, 5).map((r) => (
+              <div key={r.id} className="p-3 rounded-xl border" style={{ borderColor: C.line, background: "#fff" }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold" style={{ color: C.asphalt }}>{r.reviewer_name}</span>
+                  <span className="text-xs font-bold flex items-center gap-1" style={{ color: C.amberDark }}><Star size={11} color={C.amber} fill={C.amber} />{r.overall_rating}</span>
+                </div>
+                {r.comment && <p dir="auto" className="text-xs mt-1" style={{ color: C.steel, unicodeBidi: "plaintext" }}>{r.comment}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <p className="px-4 mt-5 mb-2 text-xs font-bold uppercase" style={{ color: C.steel, letterSpacing: 0.5 }}>{t("shopListingsCount", { n: listings.length })}</p>
       <div className="px-4">
         {listings.length === 0 ? (
@@ -3589,6 +3654,75 @@ function RedeemCodeModal({ session, onClose, onRedeemed }) {
 // a reason is required (this becomes the record of why, visible to the
 // seller and kept in the audit log), and the admin explicitly chooses
 // temporary vs permanent rather than defaulting to either.
+function StarPicker({ value, onChange, size = 22 }) {
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button key={n} type="button" onClick={() => onChange(n)}>
+          <Star size={size} color={C.amber} fill={n <= value ? C.amber : "none"} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Only reachable from a completed order — no other entry point exists,
+// which is what makes "no transaction, no review" actually true rather
+// than just a rule someone could forget to check. Sub-ratings shown
+// depend on direction: a buyer rates the part and the seller's handling
+// of it, a seller rates how the buyer paid and showed up.
+function ReviewModal({ direction, onClose, onSubmit }) {
+  const { t } = useLang();
+  const [overall, setOverall] = useState(0);
+  const [sub, setSub] = useState({ accuracy: 0, condition: 0, communication: 0, speed: 0, payment: 0, pickup: 0 });
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const isBuyerReviewing = direction === "buyer_on_seller";
+  const subKeys = isBuyerReviewing ? ["accuracy", "condition", "communication", "speed"] : ["communication", "payment", "pickup"];
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setErrorMsg("");
+    try {
+      await onSubmit({
+        overallRating: overall,
+        accuracyRating: sub.accuracy || null,
+        conditionRating: sub.condition || null,
+        communicationRating: sub.communication || null,
+        speedRating: sub.speed || null,
+        paymentRating: sub.payment || null,
+        pickupRating: sub.pickup || null,
+        comment: comment.trim() || null,
+      });
+      onClose();
+    } catch (e) {
+      setErrorMsg(e.message);
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal title={t(isBuyerReviewing ? "reviewSellerTitle" : "reviewBuyerTitle")} onClose={onClose}>
+      <div className="flex flex-col items-center mb-4">
+        <p className="text-xs font-semibold mb-2" style={{ color: C.steel }}>{t("overallRatingLabel")}</p>
+        <StarPicker value={overall} onChange={setOverall} size={30} />
+      </div>
+      {subKeys.map((k) => (
+        <div key={k} className="flex items-center justify-between mb-2.5">
+          <span className="text-sm" style={{ color: C.asphalt }}>{t("subRating_" + k)}</span>
+          <StarPicker value={sub[k]} onChange={(n) => setSub((s) => ({ ...s, [k]: n }))} />
+        </div>
+      ))}
+      <Field label={t("reviewCommentLabel")}>
+        <textarea dir="auto" style={{ ...inputStyle, minHeight: 70 }} value={comment} onChange={(e) => setComment(e.target.value)} placeholder={t("reviewCommentPlaceholder")} />
+      </Field>
+      {errorMsg && <p className="text-xs mb-3" style={{ color: C.rust }}>{errorMsg}</p>}
+      <PrimaryButton full disabled={!overall || submitting} onClick={handleSubmit}>{submitting ? t("loading") : t("submitReviewBtn")}</PrimaryButton>
+    </Modal>
+  );
+}
+
 function SuspendModal({ title, onClose, onSubmit }) {
   const { t } = useLang();
   const [reason, setReason] = useState("");
@@ -3857,7 +3991,7 @@ function OrderCard({ order, session, onOpen }) {
   );
 }
 
-function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, onDispatch, onFulfil, onConfirmReceipt, onDispute, onCancel, onSendMessage, onRequestRefund, onSubmitBankConfirmation, onRedeemCode, onConfirmSourced }) {
+function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, onDispatch, onFulfil, onConfirmReceipt, onDispute, onCancel, onSendMessage, onRequestRefund, onSubmitBankConfirmation, onRedeemCode, onConfirmSourced, onSubmitReview }) {
   const { t, lang, dir } = useLang();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   const isBuyer = session?.id === order.buyerId;
@@ -3869,6 +4003,7 @@ function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, on
   const [msgText, setMsgText] = useState("");
   const [bankRef, setBankRef] = useState("");
   const [redeemInput, setRedeemInput] = useState("");
+  const [showReview, setShowReview] = useState(false);
   const readyStatus = isPickup ? "ready_for_pickup" : "out_for_delivery";
   const fulfilledStatus = isPickup ? "collected" : "delivered";
   const statusTone = order.status === "completed" ? "green" : ["disputed", "cancelled"].includes(order.status) ? "rust" : "amber";
@@ -3971,6 +4106,21 @@ function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, on
                 <GhostButton full icon={Flag} onClick={onDispute} style={{ color: C.rust, borderColor: C.rustLight }}>{t("reportProblemBtn")}</GhostButton>
               </>
             )}
+
+            {order.status === "completed" && (isBuyer || isSeller) && !order.myReview && (
+              <PrimaryButton full icon={Star} onClick={() => setShowReview(true)}>{t(isBuyer ? "reviewSellerBtn" : "reviewBuyerBtn")}</PrimaryButton>
+            )}
+            {order.myReview && (
+              <p className="text-xs text-center flex items-center justify-center gap-1" style={{ color: C.steel }}><Star size={12} color={C.amber} fill={C.amber} />{t("youReviewedNote", { n: order.myReview.overallRating })}</p>
+            )}
+            {order.theirReview && (
+              <div className="p-3 rounded-xl border" style={{ borderColor: C.line, background: "#fff" }}>
+                <p className="text-xs font-semibold flex items-center gap-1" style={{ color: C.asphalt }}>
+                  <Star size={12} color={C.amber} fill={C.amber} /> {order.theirReview.reviewerName} — {order.theirReview.overallRating}/5
+                </p>
+                {order.theirReview.comment && <p dir="auto" className="text-xs mt-1" style={{ color: C.steel, unicodeBidi: "plaintext" }}>{order.theirReview.comment}</p>}
+              </div>
+            )}
           </>
         )}
         {order.dispute && (
@@ -4043,6 +4193,13 @@ function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, on
             </div>
           </div>
         </div>
+      )}
+      {showReview && (
+        <ReviewModal
+          direction={isBuyer ? "buyer_on_seller" : "seller_on_buyer"}
+          onClose={() => setShowReview(false)}
+          onSubmit={(form) => onSubmitReview(order.id, form)}
+        />
       )}
     </div>
   );
