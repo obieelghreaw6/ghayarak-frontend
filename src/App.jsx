@@ -104,6 +104,11 @@ const T = {
     noMatchTitle: "No parts match yet",
     noMatchSub: "Try another category, city, or search term.",
     back: "Back",
+    reportListingTitle: "Report this listing", reportReasonLabel: "Reason", reportDescLabel: "Details (optional)",
+    reportDescPlaceholder: "What's wrong with this listing?", submitReportBtn: "Submit Report", reportListingBtn: "Report this listing",
+    reportSubmittedToast: "Report submitted — thank you.", reportsAdminTab: "Reports", reportedByLabel: "Reported by {name}",
+    dismissReportBtn: "Dismiss", requestInfoBtn: "Request info", hideListingBtn: "Hide listing", escalateReportBtn: "Escalate",
+    reportResolvedToast: "Report resolved.",
     sellerProfileLoadError: "Could not load this seller.", memberSinceLabel: "Member since {date}",
     reviewSellerTitle: "Rate this seller", reviewBuyerTitle: "Rate this buyer", overallRatingLabel: "Overall",
     subRating_accuracy: "Part accuracy", subRating_condition: "Condition as described", subRating_communication: "Communication",
@@ -545,6 +550,11 @@ const T = {
     noMatchTitle: "لا توجد قطع مطابقة بعد",
     noMatchSub: "جرّب قسمًا آخر، مدينة أخرى، أو كلمة بحث مختلفة.",
     back: "رجوع",
+    reportListingTitle: "الإبلاغ عن هذا الإعلان", reportReasonLabel: "السبب", reportDescLabel: "التفاصيل (اختياري)",
+    reportDescPlaceholder: "ما المشكلة في هذا الإعلان؟", submitReportBtn: "إرسال البلاغ", reportListingBtn: "الإبلاغ عن هذا الإعلان",
+    reportSubmittedToast: "تم إرسال البلاغ — شكرًا لك.", reportsAdminTab: "البلاغات", reportedByLabel: "أبلغ عنه {name}",
+    dismissReportBtn: "تجاهل", requestInfoBtn: "طلب معلومات", hideListingBtn: "إخفاء الإعلان", escalateReportBtn: "تصعيد",
+    reportResolvedToast: "تم حل البلاغ.",
     sellerProfileLoadError: "تعذّر تحميل هذا البائع.", memberSinceLabel: "عضو منذ {date}",
     reviewSellerTitle: "قيّم هذا البائع", reviewBuyerTitle: "قيّم هذا المشتري", overallRatingLabel: "التقييم العام",
     subRating_accuracy: "دقة القطعة", subRating_condition: "الحالة كما وُصفت", subRating_communication: "التواصل",
@@ -1131,6 +1141,7 @@ const listingsApi = {
   mine: (token) => apiRequest("/listings/mine", { headers: { Authorization: `Bearer ${token}` } }),
   setStatus: (id, status, token) => apiRequest(`/listings/${id}`, { method: "PATCH", body: JSON.stringify({ status }), headers: { Authorization: `Bearer ${token}` } }),
   boost: (id, token) => apiRequest(`/listings/${id}/boost`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
+  report: (id, body, token) => apiRequest(`/listings/${id}/report`, { method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
   update: (id, fields, token) => apiRequest(`/listings/${id}`, { method: "PUT", body: JSON.stringify(fields), headers: { Authorization: `Bearer ${token}` } }),
 };
 
@@ -1148,6 +1159,8 @@ const adminApi = {
   getSellers: (token) => apiRequest("/admin/sellers", { headers: { Authorization: `Bearer ${token}` } }),
   verifyShop: (id, token) => apiRequest(`/admin/shops/${id}/verify`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
   updateSellerStatus: (type, id, status, reason, suspendedUntil, token) => apiRequest(`/admin/sellers/${type}/${id}/status`, { method: "POST", body: JSON.stringify({ status, reason, suspendedUntil }), headers: { Authorization: `Bearer ${token}` } }),
+  getListingReports: (status, token) => apiRequest(`/admin/listing-reports?status=${status}`, { headers: { Authorization: `Bearer ${token}` } }),
+  resolveListingReport: (id, status, adminNote, token) => apiRequest(`/admin/listing-reports/${id}/resolve`, { method: "POST", body: JSON.stringify({ status, adminNote }), headers: { Authorization: `Bearer ${token}` } }),
   getSettlements: (token) => apiRequest("/admin/settlements", { headers: { Authorization: `Bearer ${token}` } }),
   markSettlementPaid: (id, token) => apiRequest(`/admin/settlements/${id}/mark-paid`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
   getRefunds: (token) => apiRequest("/admin/refunds", { headers: { Authorization: `Bearer ${token}` } }),
@@ -1457,6 +1470,14 @@ const DISPUTE_REASONS = [
   { id: "counterfeit", en: "Suspected counterfeit", ar: "يُشتبه أنها مقلّدة" },
   { id: "other", en: "Other", ar: "أخرى" },
 ];
+const LISTING_REPORT_REASONS = [
+  { id: "counterfeit", en: "Suspected counterfeit", ar: "يُشتبه أنها مقلّدة" },
+  { id: "mislabeled_original", en: "Labelled original but isn't", ar: "موصوفة كأصلية وهي ليست كذلك" },
+  { id: "wrong_part", en: "Wrong part for the listed vehicle", ar: "قطعة غير مناسبة للسيارة المذكورة" },
+  { id: "misleading_description", en: "Misleading description or photos", ar: "وصف أو صور مضللة" },
+  { id: "stolen_illegal", en: "Suspected stolen or illegal", ar: "يُشتبه أنها مسروقة أو غير قانونية" },
+  { id: "other", en: "Other", ar: "أخرى" },
+];
 const findPaymentMethod = (id) => PAYMENT_METHODS.find((p) => p.id === id) || PAYMENT_METHODS[0];
 
 // A modest, honest step toward "smart search": map common Arabic/English part
@@ -1672,6 +1693,7 @@ function AppInner() {
   const [adminSettlements, setAdminSettlements] = useState([]);
   const [adminRefunds, setAdminRefunds] = useState([]);
   const [adminBankTransfers, setAdminBankTransfers] = useState([]);
+  const [adminListingReports, setAdminListingReports] = useState([]);
   const [revenue, setRevenue] = useState({ subscriptions: 0, boosts: 0, protection: 0, commission: 0 });
   const [session, setSession] = useState(null);
   const [screen, setScreen] = useState("home");
@@ -1822,6 +1844,12 @@ function AppInner() {
         setAdminBankTransfers(confirmations);
       } catch (e) {
         console.error("Could not load bank transfers.", e);
+      }
+      try {
+        const { reports } = await adminApi.getListingReports("open", session.token);
+        setAdminListingReports(reports);
+      } catch (e) {
+        console.error("Could not load listing reports.", e);
       }
     })();
   }, [screen, session?.token]);
@@ -2100,6 +2128,11 @@ function AppInner() {
     }
     flash(status === "approved" ? t("reinstatedToast") : t("suspendedToast"));
   }
+  async function handleResolveReport(reportId, status, adminNote) {
+    await adminApi.resolveListingReport(reportId, status, adminNote, session.token);
+    setAdminListingReports(adminListingReports.filter((r) => r.id !== reportId));
+    flash(t("reportResolvedToast"));
+  }
   async function handleDeleteShop(shopId) {
     await adminApi.deleteShop(shopId, session.token);
     setAdminShops(adminShops.filter((s) => s.id !== shopId));
@@ -2326,6 +2359,12 @@ function AppInner() {
     await ordersApi.submitReview(orderId, form, session.token);
     await refreshOrder(orderId);
     flash(t("reviewSubmittedToast"));
+  }
+  // Deliberately does NOT catch its own errors — ReportListingModal
+  // awaits this and shows the failure inline.
+  async function handleReportListing(listingId, form) {
+    await listingsApi.report(listingId, form, session.token);
+    flash(t("reportSubmittedToast"));
   }
 
   // --- Fulfilment: accepted -> preparing -> (ready_for_pickup | out_for_delivery) -> (collected | delivered) -> completed ---
@@ -2567,7 +2606,8 @@ function AppInner() {
               onToggleFavorite={() => requireLogin(() => toggleFavorite(activeListing.id))}
               onMessageSeller={() => requireLogin(() => setShowThreadMessage({ scope: "listing", scopeId: activeListing.id }))}
               onViewConversations={() => setShowThreadConversations({ scope: "listing", scopeId: activeListing.id })}
-              onRemoveListing={() => handleRemoveListing(activeListing.id)} />
+              onRemoveListing={() => handleRemoveListing(activeListing.id)}
+              onReportListing={handleReportListing} />
           )}
           {screen === "requests" && (
             <RequestsScreen requests={requests} session={session}
@@ -2622,11 +2662,13 @@ function AppInner() {
             <AdminScreen listings={listings} revenue={revenue} session={session}
               pendingListings={pendingListings} onModerate={handleModerateListing}
               adminShops={adminShops} adminSettlements={adminSettlements} adminRefunds={adminRefunds} adminBankTransfers={adminBankTransfers}
+              adminListingReports={adminListingReports}
               onVerify={handleVerifyShop} onRemove={handleRemoveListing} onDeleteShop={handleDeleteShop} onExit={() => setScreen("home")}
               onUpdateSellerStatus={handleUpdateSellerStatus}
               onMarkCommissionSettled={handleMarkCommissionSettled}
               onUpdateRefundStatus={handleUpdateRefundStatus}
-              onVerifyBankConfirmation={handleVerifyBankConfirmation} />
+              onVerifyBankConfirmation={handleVerifyBankConfirmation}
+              onResolveReport={handleResolveReport} />
           )}
         </main>
         {screen !== "admin" && (
@@ -3294,7 +3336,7 @@ function SellerProfileScreen({ sellerId, onBack, onOpen }) {
   );
 }
 
-function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isOwner, onOpenShop, onOpenSellerProfile, isFavorite, onToggleFavorite, onMessageSeller, onViewConversations, onRemoveListing }) {
+function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isOwner, onOpenShop, onOpenSellerProfile, isFavorite, onToggleFavorite, onMessageSeller, onViewConversations, onRemoveListing, onReportListing }) {
   const { t, lang, dir } = useLang();
   const Icon = CAT_ICON[listing.category] || Package;
   const shop = listing.shopId ? shops.find((s) => s.id === listing.shopId) : null;
@@ -3303,6 +3345,7 @@ function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isO
   const cond = findCondition(listing.condition);
   const city = findCity(listing.city);
   const images = listing.images || [];
+  const [showReportListing, setShowReportListing] = useState(false);
   const hasImages = images.length > 0;
   const [activeImg, setActiveImg] = useState(0);
   const galleryRef = useRef(null);
@@ -3406,8 +3449,16 @@ function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isO
           ) : listing.status === "reserved" ? (
             <div className="w-full text-center p-3 rounded-lg text-sm font-semibold" style={{ background: C.sand, color: C.steel }}>{t("listingReservedNote")}</div>
           ) : null}
+          {!isOwner && session && (
+            <button onClick={() => setShowReportListing(true)} className="text-xs font-semibold flex items-center justify-center gap-1 py-1" style={{ color: C.steel }}>
+              <Flag size={11} />{t("reportListingBtn")}
+            </button>
+          )}
         </div>
       </div>
+      {showReportListing && (
+        <ReportListingModal session={session} onClose={() => setShowReportListing(false)} onSubmit={(form) => onReportListing(listing.id, form)} />
+      )}
     </div>
   );
 }
@@ -4310,6 +4361,48 @@ function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, on
         />
       )}
     </div>
+  );
+}
+
+// Open to anyone browsing, not just a buyer with a completed order — a
+// counterfeit or mislabeled part is a problem to catch early, not
+// something that should have to wait for a transaction first.
+function ReportListingModal({ session, onClose, onSubmit }) {
+  const { t, lang } = useLang();
+  const [reason, setReason] = useState(LISTING_REPORT_REASONS[0].id);
+  const [description, setDescription] = useState("");
+  const [images, setImages] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setErrorMsg("");
+    try {
+      await onSubmit({ reason, description: description.trim() || null, images: images.map((i) => ({ id: i.id, url: i.url, thumbnailUrl: i.thumbnailUrl })) });
+      onClose();
+    } catch (e) {
+      setErrorMsg(e.message);
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal title={t("reportListingTitle")} onClose={onClose}>
+      <Field label={t("reportReasonLabel")}>
+        <select style={inputStyle} value={reason} onChange={(e) => setReason(e.target.value)}>
+          {LISTING_REPORT_REASONS.map((r) => <option key={r.id} value={r.id}>{label(r, lang)}</option>)}
+        </select>
+      </Field>
+      <Field label={t("reportDescLabel")}>
+        <textarea dir="auto" style={{ ...inputStyle, minHeight: 70 }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("reportDescPlaceholder")} />
+      </Field>
+      <Field label={t("disputeEvidenceLabel")}>
+        <ImageUploader images={images} onChange={setImages} purpose="report" session={session} maxImages={6} />
+      </Field>
+      {errorMsg && <p className="text-xs mb-3" style={{ color: C.rust }}>{errorMsg}</p>}
+      <PrimaryButton full disabled={submitting} onClick={handleSubmit} style={{ background: C.rust }}>{submitting ? t("loading") : t("submitReportBtn")}</PrimaryButton>
+    </Modal>
   );
 }
 
@@ -5252,7 +5345,7 @@ function BoostModal({ onClose, onBoost }) {
 /* ---------------------------------------------------------------------
    ADMIN / OWNER DASHBOARD
 --------------------------------------------------------------------- */
-function AdminScreen({ listings, revenue, session, pendingListings, adminShops, adminSettlements, adminRefunds, adminBankTransfers, onModerate, onVerify, onRemove, onDeleteShop, onExit, onMarkCommissionSettled, onUpdateRefundStatus, onVerifyBankConfirmation, onUpdateSellerStatus }) {
+function AdminScreen({ listings, revenue, session, pendingListings, adminShops, adminSettlements, adminRefunds, adminBankTransfers, adminListingReports, onModerate, onVerify, onRemove, onDeleteShop, onExit, onMarkCommissionSettled, onUpdateRefundStatus, onVerifyBankConfirmation, onUpdateSellerStatus, onResolveReport }) {
   const { t, lang } = useLang();
   const [tab, setTab] = useState("overview");
   const activeListings = listings.filter((l) => l.status === "active");
@@ -5338,7 +5431,7 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
         <button onClick={onExit} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: C.asphalt3, color: "#fff" }}>{t("exit")}</button>
       </div>
       <div className="flex overflow-x-auto px-4 pt-3 gap-1 border-b" style={{ borderColor: C.line }}>
-        {[{ id: "overview", label: t("tabOverview") }, { id: "moderation", label: t("tabModeration"), badge: pendingListings.length }, { id: "revenue", label: t("tabRevenue") }, { id: "listings", label: t("tabListings") }, { id: "shops", label: t("tabShops"), badge: pendingShops.length }, { id: "settlements", label: t("settlementsTab"), badge: adminSettlements.length }, { id: "refunds", label: t("refundsAdminTab"), badge: adminRefunds.length }, { id: "bankTransfers", label: t("bankTransfersAdminTab"), badge: adminBankTransfers.length }].map((tb) => (
+        {[{ id: "overview", label: t("tabOverview") }, { id: "moderation", label: t("tabModeration"), badge: pendingListings.length }, { id: "revenue", label: t("tabRevenue") }, { id: "listings", label: t("tabListings") }, { id: "shops", label: t("tabShops"), badge: pendingShops.length }, { id: "settlements", label: t("settlementsTab"), badge: adminSettlements.length }, { id: "refunds", label: t("refundsAdminTab"), badge: adminRefunds.length }, { id: "bankTransfers", label: t("bankTransfersAdminTab"), badge: adminBankTransfers.length }, { id: "reports", label: t("reportsAdminTab"), badge: adminListingReports.length }].map((tb) => (
           <button key={tb.id} onClick={() => setTab(tb.id)} className="px-3 py-2 text-xs font-semibold whitespace-nowrap rounded-t-lg flex items-center gap-1.5" style={{ color: tab === tb.id ? C.amberDark : C.steel, borderBottom: tab === tb.id ? `2px solid ${C.amber}` : "2px solid transparent" }}>
             {tb.label}
             {!!tb.badge && <span className="text-[10px] font-bold rounded-full px-1.5 py-0.5" style={{ background: C.rust, color: "#fff" }}>{tb.badge}</span>}
@@ -5640,6 +5733,43 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
             </div>
           )
         )}
+        {tab === "reports" && (
+          adminListingReports.length === 0 ? (
+            <p className="text-sm py-10 text-center" style={{ color: C.steel }}>{t("noPendingItems")}</p>
+          ) : (
+            <div className="space-y-2">
+              {adminListingReports.map((r) => (
+                <div key={r.id} className="p-3 rounded-xl border" style={{ background: "#fff", borderColor: C.line }}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge tone="rust">{label(LISTING_REPORT_REASONS.find((x) => x.id === r.reason), lang)}</Badge>
+                    <Badge>{t("status" + r.listing_status.charAt(0).toUpperCase() + r.listing_status.slice(1))}</Badge>
+                  </div>
+                  <p dir="auto" className="text-sm font-semibold" style={{ color: C.asphalt, unicodeBidi: "plaintext" }}>{r.listing_title}</p>
+                  <p className="text-xs mt-0.5" style={{ color: C.steel }}>{t("reportedByLabel", { name: r.reporter_name })} · {r.seller_name}</p>
+                  {r.description && <p dir="auto" className="text-xs mt-1.5 p-2 rounded-lg" style={{ background: C.sand, color: C.asphalt, unicodeBidi: "plaintext" }}>{r.description}</p>}
+                  {r.images?.length > 0 && (
+                    <div className="flex gap-2 mt-2 overflow-x-auto">
+                      {r.images.map((img, i) => (
+                        <a key={img.id || i} href={img.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border" style={{ borderColor: C.line }}>
+                          <img src={img.thumbnailUrl || img.url} alt="" className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-1.5 mt-2.5 flex-wrap">
+                    <button onClick={() => onResolveReport(r.id, "dismissed", null)} className="text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ background: C.sand, color: C.asphalt }}>{t("dismissReportBtn")}</button>
+                    <button onClick={() => onResolveReport(r.id, "info_requested", null)} className="text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ background: C.amberLight, color: C.amberDark }}>{t("requestInfoBtn")}</button>
+                    {r.listing_status === "active" && (
+                      <button onClick={async () => { await onRemove(r.listing_id); await onResolveReport(r.id, "listing_hidden", null); }} className="text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ background: C.rustLight, color: C.rust }}>{t("hideListingBtn")}</button>
+                    )}
+                    <button onClick={() => setSuspendTarget({ type: "individual", id: r.seller_id, name: r.seller_name, reportId: r.id })} className="text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ background: C.rustLight, color: C.rust }}>{t("suspendSellerBtn")}</button>
+                    <button onClick={() => onResolveReport(r.id, "escalated", null)} className="text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ background: C.asphalt, color: "#fff" }}>{t("escalateReportBtn")}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
       </div>
       {confirmAction && (
         <ConfirmActionModal message={confirmAction.message} run={confirmAction.run} onClose={() => setConfirmAction(null)} />
@@ -5648,7 +5778,10 @@ function AdminScreen({ listings, revenue, session, pendingListings, adminShops, 
         <SuspendModal
           title={t("suspendModalTitle", { name: suspendTarget.name })}
           onClose={() => setSuspendTarget(null)}
-          onSubmit={(reason, suspendedUntil) => onUpdateSellerStatus(suspendTarget.type, suspendTarget.id, "suspended", reason, suspendedUntil)}
+          onSubmit={async (reason, suspendedUntil) => {
+            await onUpdateSellerStatus(suspendTarget.type, suspendTarget.id, "suspended", reason, suspendedUntil);
+            if (suspendTarget.reportId) await onResolveReport(suspendTarget.reportId, "seller_suspended", reason);
+          }}
         />
       )}
     </div>
