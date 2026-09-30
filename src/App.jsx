@@ -104,6 +104,7 @@ const T = {
     noMatchTitle: "No parts match yet",
     noMatchSub: "Try another category, city, or search term.",
     back: "Back",
+    requestPhotosLabel: "Photos (optional)", offerPhotosLabel: "Photos of what you have (optional)",
     bulkUploadTitle: "Bulk upload parts", bulkUploadIntro: "Upload a CSV to add many parts at once instead of one by one.",
     downloadTemplateBtn: "Download CSV template", chooseCsvBtn: "Choose CSV file", bulkFileReadError: "Could not read that file.",
     bulkValidLabel: "Ready to import", bulkNeedCorrectionLabel: "Need correction", bulkRowLabel: "Row {n}",
@@ -555,6 +556,7 @@ const T = {
     noMatchTitle: "لا توجد قطع مطابقة بعد",
     noMatchSub: "جرّب قسمًا آخر، مدينة أخرى، أو كلمة بحث مختلفة.",
     back: "رجوع",
+    requestPhotosLabel: "صور (اختياري)", offerPhotosLabel: "صور لما لديك (اختياري)",
     bulkUploadTitle: "رفع القطع بالجملة", bulkUploadIntro: "ارفع ملف CSV لإضافة عدة قطع دفعة واحدة بدلاً من واحدة تلو الأخرى.",
     downloadTemplateBtn: "تحميل نموذج CSV", chooseCsvBtn: "اختر ملف CSV", bulkFileReadError: "تعذّرت قراءة الملف.",
     bulkValidLabel: "جاهزة للاستيراد", bulkNeedCorrectionLabel: "تحتاج تصحيح", bulkRowLabel: "الصف {n}",
@@ -1287,6 +1289,7 @@ function mapApiOffer(o) {
     delivery: o.delivery_available,
     canSource: o.can_source,
     sourcingDays: o.sourcing_days,
+    images: o.images || [],
     createdAt: o.created_at ? new Date(o.created_at).getTime() : Date.now(),
   };
 }
@@ -1307,6 +1310,7 @@ function mapApiRequest(r, offers) {
     model: r.model,
     year: r.year,
     partDescription: r.part_description,
+    images: r.images || [],
     conditionPreference: r.condition_preference,
     city: r.city,
     urgency: r.urgency,
@@ -2723,8 +2727,8 @@ function AppInner() {
         {showAddCar && session && <AddCarModal onClose={() => setShowAddCar(false)} onSave={handleSaveCar} />}
         {showShopCreate && session && <CreateShopModal onClose={() => setShowShopCreate(false)} onSubmit={handleCreateShop} />}
         {showBoost && <BoostModal onClose={() => setShowBoost(null)} onBoost={() => handleBoost(showBoost)} />}
-        {showNewRequest !== null && session && <NewRequestModal onClose={() => setShowNewRequest(null)} onSubmit={handleCreateRequest} initialDescription={showNewRequest} />}
-        {showOffer && session && <OfferModal onClose={() => setShowOffer(null)} onSubmit={(form) => handleSubmitOffer(showOffer, form)} />}
+        {showNewRequest !== null && session && <NewRequestModal session={session} onClose={() => setShowNewRequest(null)} onSubmit={handleCreateRequest} initialDescription={showNewRequest} />}
+        {showOffer && session && <OfferModal session={session} onClose={() => setShowOffer(null)} onSubmit={(form) => handleSubmitOffer(showOffer, form)} />}
         {showBuy && session && <BuyModal listing={showBuy} onClose={() => setShowBuy(null)} onSubmit={(form) => handleCreateOrder(showBuy, form)} />}
         {showRedeemCode && session && (
           <RedeemCodeModal session={session} onClose={() => setShowRedeemCode(false)} onRedeemed={() => flash(t("codeRedeemedToast"))} />
@@ -3602,6 +3606,15 @@ function RequestDetail({ request, session, myShop, onBack, onOffer, onAccept, on
         </div>
         <p className="text-lg font-bold mt-1" style={{ color: C.asphalt }}>{request.make} {request.model} {request.year ? `· ${request.year}` : ""}</p>
         <p dir="auto" className="text-sm mt-2" style={{ color: C.asphalt, unicodeBidi: "plaintext" }}>{request.partDescription}</p>
+        {request.images?.length > 0 && (
+          <div className="flex gap-2 mt-2 overflow-x-auto">
+            {request.images.map((img, i) => (
+              <a key={img.id || i} href={img.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border" style={{ borderColor: C.line }}>
+                <img src={img.thumbnailUrl || img.url} alt="" className="w-full h-full object-cover" />
+              </a>
+            ))}
+          </div>
+        )}
         <div className="flex items-center gap-3 mt-3 text-xs" style={{ color: C.steel }}>
           <span className="flex items-center gap-1"><MapPin size={12} />{label(city, lang)}</span>
           <span className="flex items-center gap-1"><User size={12} />{t("requestFrom")}: {request.requesterName}</span>
@@ -3656,6 +3669,15 @@ function RequestDetail({ request, session, myShop, onBack, onOffer, onAccept, on
               )}
               <p className="text-xs mt-1" style={{ color: C.steel }}>{o.condition}{o.delivery ? ` · ${t("offerDeliveryCheckbox")}` : ""}</p>
               {o.notes && <p dir="auto" className="text-xs mt-1" style={{ color: C.asphalt, unicodeBidi: "plaintext" }}>{o.notes}</p>}
+              {o.images?.length > 0 && (
+                <div className="flex gap-2 mt-2 overflow-x-auto">
+                  {o.images.map((img, i) => (
+                    <a key={img.id || i} href={img.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border" style={{ borderColor: C.line }}>
+                      <img src={img.thumbnailUrl || img.url} alt="" className="w-full h-full object-cover" />
+                    </a>
+                  ))}
+                </div>
+              )}
               <div className="flex gap-2 mt-2">
                 {isRequester && request.status === "open" && (
                   <button onClick={() => onAccept(o.id)} className="text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1" style={{ background: C.greenLight, color: C.green }}><CheckCircle2 size={12} />{t("acceptOfferBtn")}</button>
@@ -3672,9 +3694,10 @@ function RequestDetail({ request, session, myShop, onBack, onOffer, onAccept, on
   );
 }
 
-function NewRequestModal({ onClose, onSubmit, initialDescription }) {
+function NewRequestModal({ session, onClose, onSubmit, initialDescription }) {
   const { t, lang } = useLang();
   const [form, setForm] = useState({ make: MAKES[0], model: "", year: "", partDescription: initialDescription || "", conditionPreference: "any", city: CITIES[0].id, urgency: "flexible" });
+  const [images, setImages] = useState([]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const valid = form.partDescription.trim() && form.model.trim();
 
@@ -3687,6 +3710,9 @@ function NewRequestModal({ onClose, onSubmit, initialDescription }) {
         <Field label={t("yearFrom")}><input type="number" style={inputStyle} value={form.year} onChange={(e) => set("year", e.target.value)} placeholder="2020" /></Field>
       </div>
       <Field label={t("requestPartDesc")}><textarea dir="auto" style={{ ...inputStyle, minHeight: 80 }} value={form.partDescription} onChange={(e) => set("partDescription", e.target.value)} placeholder={t("requestPartDescPlaceholder")} /></Field>
+      <Field label={t("requestPhotosLabel")}>
+        <ImageUploader images={images} onChange={setImages} purpose="request" session={session} maxImages={4} />
+      </Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label={t("requestCondition")}>
           <select style={inputStyle} value={form.conditionPreference} onChange={(e) => set("conditionPreference", e.target.value)}>
@@ -3705,7 +3731,7 @@ function NewRequestModal({ onClose, onSubmit, initialDescription }) {
           ))}
         </div>
       </Field>
-      <PrimaryButton full disabled={!valid} onClick={() => onSubmit({ ...form, year: form.year ? Number(form.year) : null })}>{t("submitRequestBtn")}</PrimaryButton>
+      <PrimaryButton full disabled={!valid} onClick={() => onSubmit({ ...form, year: form.year ? Number(form.year) : null, images: images.map((i) => ({ id: i.id, url: i.url, thumbnailUrl: i.thumbnailUrl })) })}>{t("submitRequestBtn")}</PrimaryButton>
     </Modal>
   );
 }
@@ -4045,9 +4071,10 @@ function ThreadConversationsModal({ scope, scopeId, session, onClose, onOpenThre
   );
 }
 
-function OfferModal({ onClose, onSubmit }) {
+function OfferModal({ session, onClose, onSubmit }) {
   const { t } = useLang();
   const [form, setForm] = useState({ price: "", condition: "", notes: "", delivery: false, canSource: false, sourcingDays: "" });
+  const [images, setImages] = useState([]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const valid = form.price && form.condition.trim() && (!form.canSource || (form.sourcingDays && +form.sourcingDays > 0));
 
@@ -4063,10 +4090,13 @@ function OfferModal({ onClose, onSubmit }) {
       <Field label={t("offerPrice")}><input type="number" style={inputStyle} value={form.price} onChange={(e) => set("price", +e.target.value)} placeholder="0" /></Field>
       <Field label={t("offerCondition")}><input style={inputStyle} value={form.condition} onChange={(e) => set("condition", e.target.value)} placeholder="e.g. New, OEM" /></Field>
       <Field label={t("offerNotes")}><textarea dir="auto" style={{ ...inputStyle, minHeight: 60 }} value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder={t("offerNotesPlaceholder")} /></Field>
+      <Field label={t("offerPhotosLabel")}>
+        <ImageUploader images={images} onChange={setImages} purpose="offer" session={session} maxImages={4} />
+      </Field>
       <label className="flex items-center gap-2 mb-4 text-sm" style={{ color: C.asphalt }}>
         <input type="checkbox" checked={form.delivery} onChange={(e) => set("delivery", e.target.checked)} /> {t("offerDeliveryCheckbox")}
       </label>
-      <PrimaryButton full disabled={!valid} onClick={() => onSubmit({ ...form, price: Number(form.price), sourcingDays: form.canSource ? Number(form.sourcingDays) : null })}>{t("submitOfferBtn")}</PrimaryButton>
+      <PrimaryButton full disabled={!valid} onClick={() => onSubmit({ ...form, price: Number(form.price), sourcingDays: form.canSource ? Number(form.sourcingDays) : null, images: images.map((i) => ({ id: i.id, url: i.url, thumbnailUrl: i.thumbnailUrl })) })}>{t("submitOfferBtn")}</PrimaryButton>
     </Modal>
   );
 }
