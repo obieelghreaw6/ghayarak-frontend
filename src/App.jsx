@@ -7,7 +7,7 @@ import {
   CircleDot, LogOut, Camera, Lightbulb, Wind, Gauge, Armchair,
   RectangleHorizontal, Cog, Settings2, Disc, Sparkles, BadgeCheck, AlertTriangle, Trash2,
   Rocket, Building2, Eye, EyeOff, MessageCircle,
-  Languages, ShoppingCart, Truck, Bike, AlertOctagon, PackageCheck, Info, Ban,
+  Languages, ShoppingCart, Truck, Bike, AlertOctagon, PackageCheck, Info, Ban, FileDown, Upload,
   CircleDollarSign, Flag, ChevronDown, Home, Filter as FilterIcon, Send, Bell, PackageSearch
 } from "lucide-react";
 import {
@@ -104,6 +104,10 @@ const T = {
     noMatchTitle: "No parts match yet",
     noMatchSub: "Try another category, city, or search term.",
     back: "Back",
+    bulkUploadTitle: "Bulk upload parts", bulkUploadIntro: "Upload a CSV to add many parts at once instead of one by one.",
+    downloadTemplateBtn: "Download CSV template", chooseCsvBtn: "Choose CSV file", bulkFileReadError: "Could not read that file.",
+    bulkValidLabel: "Ready to import", bulkNeedCorrectionLabel: "Need correction", bulkRowLabel: "Row {n}",
+    bulkImportBtn: "Import {n} listings", bulkImportedToast: "{n} listings imported — sent for review.", bulkUploadBtn: "Bulk upload from CSV",
     shopCoverField: "Cover photo", shopLogoField: "Logo", shopUpdatedToast: "Shop updated.",
     reportListingTitle: "Report this listing", reportReasonLabel: "Reason", reportDescLabel: "Details (optional)",
     reportDescPlaceholder: "What's wrong with this listing?", submitReportBtn: "Submit Report", reportListingBtn: "Report this listing",
@@ -551,6 +555,10 @@ const T = {
     noMatchTitle: "لا توجد قطع مطابقة بعد",
     noMatchSub: "جرّب قسمًا آخر، مدينة أخرى، أو كلمة بحث مختلفة.",
     back: "رجوع",
+    bulkUploadTitle: "رفع القطع بالجملة", bulkUploadIntro: "ارفع ملف CSV لإضافة عدة قطع دفعة واحدة بدلاً من واحدة تلو الأخرى.",
+    downloadTemplateBtn: "تحميل نموذج CSV", chooseCsvBtn: "اختر ملف CSV", bulkFileReadError: "تعذّرت قراءة الملف.",
+    bulkValidLabel: "جاهزة للاستيراد", bulkNeedCorrectionLabel: "تحتاج تصحيح", bulkRowLabel: "الصف {n}",
+    bulkImportBtn: "استيراد {n} إعلان", bulkImportedToast: "تم استيراد {n} إعلان — أُرسلت للمراجعة.", bulkUploadBtn: "رفع بالجملة من CSV",
     shopCoverField: "صورة الغلاف", shopLogoField: "الشعار", shopUpdatedToast: "تم تحديث المحل.",
     reportListingTitle: "الإبلاغ عن هذا الإعلان", reportReasonLabel: "السبب", reportDescLabel: "التفاصيل (اختياري)",
     reportDescPlaceholder: "ما المشكلة في هذا الإعلان؟", submitReportBtn: "إرسال البلاغ", reportListingBtn: "الإبلاغ عن هذا الإعلان",
@@ -1143,6 +1151,8 @@ const listingsApi = {
   mine: (token) => apiRequest("/listings/mine", { headers: { Authorization: `Bearer ${token}` } }),
   setStatus: (id, status, token) => apiRequest(`/listings/${id}`, { method: "PATCH", body: JSON.stringify({ status }), headers: { Authorization: `Bearer ${token}` } }),
   boost: (id, token) => apiRequest(`/listings/${id}/boost`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
+  bulkPreview: (csv, token) => apiRequest("/listings/bulk/preview", { method: "POST", body: JSON.stringify({ csv }), headers: { Authorization: `Bearer ${token}` } }),
+  bulkImport: (rows, shopId, token) => apiRequest("/listings/bulk/import", { method: "POST", body: JSON.stringify({ rows, shopId }), headers: { Authorization: `Bearer ${token}` } }),
   report: (id, body, token) => apiRequest(`/listings/${id}/report`, { method: "POST", body: JSON.stringify(body), headers: { Authorization: `Bearer ${token}` } }),
   update: (id, fields, token) => apiRequest(`/listings/${id}`, { method: "PUT", body: JSON.stringify(fields), headers: { Authorization: `Bearer ${token}` } }),
 };
@@ -1709,6 +1719,7 @@ function AppInner() {
   const [activeSellerId, setActiveSellerId] = useState(null);
   const [showThreadMessage, setShowThreadMessage] = useState(null);
   const [showRedeemCode, setShowRedeemCode] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [showThreadConversations, setShowThreadConversations] = useState(null);
   const [activeShop, setActiveShop] = useState(null);
   const [editingListing, setEditingListing] = useState(null);
@@ -2153,6 +2164,14 @@ function AppInner() {
       flash(t(decision === "approved" ? "listingApprovedToast" : decision === "rejected" ? "listingRejectedToast" : "listingFlaggedToast"));
     } catch (e) {
       flash(e.message);
+    }
+  }
+  async function handleBulkImported() {
+    try {
+      const { listings: mine } = await listingsApi.mine(session.token);
+      setMyListingsAll(mine.map(mapApiListing));
+    } catch (e) {
+      console.error("Could not refresh listings after bulk import.", e);
     }
   }
   async function handleRemoveListing(listingId) {
@@ -2604,6 +2623,7 @@ function AppInner() {
               onBoost={(id) => setShowBoost(id)}
               onOpenRequest={handleOpenRequest}
               onOpenRedeemCode={() => setShowRedeemCode(true)}
+              onBulkUpload={() => setShowBulkUpload(true)}
               onBack={() => setScreen("account")} />
           )}
           {screen === "listing" && activeListing && (
@@ -2708,6 +2728,9 @@ function AppInner() {
         {showBuy && session && <BuyModal listing={showBuy} onClose={() => setShowBuy(null)} onSubmit={(form) => handleCreateOrder(showBuy, form)} />}
         {showRedeemCode && session && (
           <RedeemCodeModal session={session} onClose={() => setShowRedeemCode(false)} onRedeemed={() => flash(t("codeRedeemedToast"))} />
+        )}
+        {showBulkUpload && session && (
+          <BulkUploadModal session={session} shopId={myShop?.id} onClose={() => setShowBulkUpload(false)} onImported={handleBulkImported} />
         )}
         {showThreadMessage && session && (
           <ThreadMessageModal scope={showThreadMessage.scope} scopeId={showThreadMessage.scopeId} otherPartyId={showThreadMessage.otherPartyId} otherPartyName={showThreadMessage.otherPartyName} session={session} onClose={() => setShowThreadMessage(null)} />
@@ -4533,7 +4556,7 @@ function NotificationsPanel({ session, onClose, onMarkAllRead, onOpen }) {
 /* ---------------------------------------------------------------------
    Seller Center
 --------------------------------------------------------------------- */
-function SellerCenterScreen({ session, myShop, myListings, mySales, matchingRequests, onAddPart, onEditShop, onEditListing, onSetStatus, onRemove, onBoost, onOpenRequest, onOpenRedeemCode, onBack }) {
+function SellerCenterScreen({ session, myShop, myListings, mySales, matchingRequests, onAddPart, onEditShop, onEditListing, onSetStatus, onRemove, onBoost, onOpenRequest, onOpenRedeemCode, onBulkUpload, onBack }) {
   const { t, lang, dir } = useLang();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   const [tab, setTab] = useState("dashboard");
@@ -4645,6 +4668,9 @@ function SellerCenterScreen({ session, myShop, myListings, mySales, matchingRequ
           <div className="grid grid-cols-2 gap-2 mt-4">
             <PrimaryButton icon={Plus} onClick={onAddPart}>{t("addPartBtn")}</PrimaryButton>
             {myShop && <GhostButton icon={Building2} onClick={onEditShop}>{t("editShopBtn")}</GhostButton>}
+          </div>
+          <div className="mt-2">
+            <GhostButton full icon={FileDown} onClick={onBulkUpload}>{t("bulkUploadBtn")}</GhostButton>
           </div>
         </div>
       )}
@@ -5314,6 +5340,115 @@ function EditShopModal({ shop, session, onClose, onSubmit }) {
         <input type="checkbox" checked={form.deliveryAvailable} onChange={(e) => set("deliveryAvailable", e.target.checked)} /> {t("deliveryOnlyFilter")}
       </label>
       <PrimaryButton full disabled={!valid} onClick={handleSubmit}>{t("updateListingBtn")}</PrimaryButton>
+    </Modal>
+  );
+}
+
+const BULK_CSV_TEMPLATE =
+  "title,category,make,model,yearFrom,yearTo,price,condition,city,vehicleType,description\n" +
+  'Toyota Camry Headlight (Right),lighting,Toyota,Camry,2015,2017,450,used,tripoli,car,"Original, tested working"\n' +
+  "BMW X5 Front Control Arm,suspension,BMW,X5,2014,2018,320,new,benghazi,car,\n";
+
+// Preview-then-import, matching the actual backend flow: nothing is
+// created until the seller explicitly confirms after seeing exactly
+// what would happen — how many rows are fine, and precisely why the
+// rest aren't, rather than an all-or-nothing "upload and hope."
+function BulkUploadModal({ session, shopId, onClose, onImported }) {
+  const { t } = useLang();
+  const [step, setStep] = useState("pick"); // pick | preview | importing | done
+  const [preview, setPreview] = useState(null);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [importedCount, setImportedCount] = useState(0);
+  const fileInputRef = useRef(null);
+
+  function downloadTemplate() {
+    const blob = new Blob([BULK_CSV_TEMPLATE], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "ghayarak-bulk-template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleFileSelected(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setErrorMsg("");
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const result = await listingsApi.bulkPreview(reader.result, session.token);
+        setPreview(result);
+        setStep("preview");
+      } catch (err) {
+        setErrorMsg(err.message);
+      }
+    };
+    reader.onerror = () => setErrorMsg(t("bulkFileReadError"));
+    reader.readAsText(file);
+  }
+
+  async function handleImport() {
+    setStep("importing");
+    setErrorMsg("");
+    try {
+      const { created } = await listingsApi.bulkImport(preview.validRows, shopId, session.token);
+      setImportedCount(created);
+      setStep("done");
+      onImported?.();
+    } catch (err) {
+      setErrorMsg(err.message);
+      setStep("preview");
+    }
+  }
+
+  return (
+    <Modal title={t("bulkUploadTitle")} onClose={onClose} wide>
+      {step === "pick" && (
+        <>
+          <p className="text-sm mb-3" style={{ color: C.steel }}>{t("bulkUploadIntro")}</p>
+          <button onClick={downloadTemplate} className="text-xs font-semibold flex items-center gap-1.5 mb-4" style={{ color: C.amberDark }}>
+            <FileDown size={14} />{t("downloadTemplateBtn")}
+          </button>
+          <input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={handleFileSelected} style={{ display: "none" }} />
+          {errorMsg && <p className="text-xs mb-3" style={{ color: C.rust }}>{errorMsg}</p>}
+          <PrimaryButton full icon={Upload} onClick={() => fileInputRef.current?.click()}>{t("chooseCsvBtn")}</PrimaryButton>
+        </>
+      )}
+      {step === "preview" && preview && (
+        <>
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="p-3 rounded-xl text-center" style={{ background: C.greenLight }}>
+              <p className="text-xl font-bold" style={{ color: C.green }}>{preview.validCount}</p>
+              <p className="text-xs" style={{ color: C.green }}>{t("bulkValidLabel")}</p>
+            </div>
+            <div className="p-3 rounded-xl text-center" style={{ background: C.rustLight }}>
+              <p className="text-xl font-bold" style={{ color: C.rust }}>{preview.invalidCount}</p>
+              <p className="text-xs" style={{ color: C.rust }}>{t("bulkNeedCorrectionLabel")}</p>
+            </div>
+          </div>
+          {preview.invalidRows.length > 0 && (
+            <div className="mb-4 max-h-40 overflow-y-auto space-y-1.5">
+              {preview.invalidRows.map((r) => (
+                <p key={r.row} className="text-xs p-2 rounded-lg" style={{ background: C.sand, color: C.asphalt }}>
+                  {t("bulkRowLabel", { n: r.row })}: {r.errors.join(", ")}
+                </p>
+              ))}
+            </div>
+          )}
+          {errorMsg && <p className="text-xs mb-3" style={{ color: C.rust }}>{errorMsg}</p>}
+          <PrimaryButton full disabled={preview.validCount === 0} onClick={handleImport}>{t("bulkImportBtn", { n: preview.validCount })}</PrimaryButton>
+        </>
+      )}
+      {step === "importing" && <p className="text-sm py-10 text-center" style={{ color: C.steel }}>{t("loading")}</p>}
+      {step === "done" && (
+        <>
+          <p className="text-sm mb-4 flex items-center gap-2" style={{ color: C.green }}><CheckCircle2 size={16} />{t("bulkImportedToast", { n: importedCount })}</p>
+          <PrimaryButton full onClick={onClose}>{t("close")}</PrimaryButton>
+        </>
+      )}
     </Modal>
   );
 }
