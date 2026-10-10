@@ -323,13 +323,14 @@ const T = {
     buyModalTitle: "Complete your order",
     partPriceLabel: "Part price",
     deliveryFeeLabel: "Delivery",
-    protectionFeeLabelShort: "Buyer protection",
+    protectionFeeLabelShort: "Ghayarak protection fee",
     totalToPay: "Total to pay",
     paymentMethodLabel: "Payment method",
     deliveryMethodLabel: "How will you get it?",
     pickupOption: "Pickup", deliveryOption: "Delivery",
     includeProtectionCheckbox: "Add buyer protection ({fee} LYD)",
-    sellerCommissionNote: "The seller pays a {pct}% platform commission on this sale — that's how Ghayarak earns, not from you.",
+    sellerCommissionNote: "The seller keeps the full price of the part. Ghayarak's {pct}% protection fee is added on top.",
+    payFeeBtn: "Pay protection fee", payFeeNote: "Pay the protection fee to confirm your order. You pay the seller for the part directly.", feePaidLabel: "Protection fee paid", feeUnavailable: "Payment page unavailable right now — try again in a moment.", refreshFeeBtn: "I've paid — refresh", feePayLinkToast: "Opening the payment page…",
     placeOrderBtn: "Place order",
     orderPlacedToast: "Order placed — the seller has been notified.",
     myOrdersLabel: "My orders", mySalesLabel: "My sales",
@@ -345,7 +346,7 @@ const T = {
     reportProblemBtn: "Report a problem",
     orderAcceptedToast: "Order accepted.",
     orderDeliveredToast: "Marked as delivered.",
-    orderCompletedToast: "Order completed. Commission invoiced to the seller.",
+    orderCompletedToast: "Order completed.",
     disputeTitle: "Report a problem",
     disputeReasonLabel: "What went wrong?",
     disputeEvidenceLabel: "Photos (optional but helps a lot)",
@@ -775,13 +776,14 @@ const T = {
     buyModalTitle: "أكمل طلبك",
     partPriceLabel: "سعر القطعة",
     deliveryFeeLabel: "التوصيل",
-    protectionFeeLabelShort: "حماية المشتري",
+    protectionFeeLabelShort: "رسوم حماية غيارك",
     totalToPay: "الإجمالي المطلوب دفعه",
     paymentMethodLabel: "طريقة الدفع",
     deliveryMethodLabel: "كيف تريد استلامها؟",
     pickupOption: "استلام شخصي", deliveryOption: "توصيل",
     includeProtectionCheckbox: "إضافة حماية المشتري ({fee} د.ل)",
-    sellerCommissionNote: "يدفع البائع عمولة منصة {pct}٪ على هذه الصفقة — من هنا يربح غيارك، وليس منك.",
+    sellerCommissionNote: "يحصل البائع على كامل سعر القطعة. تُضاف رسوم حماية غيارك ({pct}٪) فوق السعر.",
+    payFeeBtn: "ادفع رسوم الحماية", payFeeNote: "ادفع رسوم الحماية لتأكيد طلبك. تدفع للبائع ثمن القطعة مباشرة.", feePaidLabel: "تم دفع رسوم الحماية", feeUnavailable: "صفحة الدفع غير متاحة حالياً — حاول بعد قليل.", refreshFeeBtn: "دفعت — حدّث", feePayLinkToast: "جارٍ فتح صفحة الدفع…",
     placeOrderBtn: "تأكيد الطلب",
     orderPlacedToast: "تم إنشاء الطلب — تم إشعار البائع.",
     myOrdersLabel: "مشترياتي", mySalesLabel: "مبيعاتي",
@@ -797,7 +799,7 @@ const T = {
     reportProblemBtn: "الإبلاغ عن مشكلة",
     orderAcceptedToast: "تم قبول الطلب.",
     orderDeliveredToast: "تم تحديده كمُسلَّم.",
-    orderCompletedToast: "اكتمل الطلب. تم إصدار فاتورة العمولة للبائع.",
+    orderCompletedToast: "اكتمل الطلب.",
     disputeTitle: "الإبلاغ عن مشكلة",
     disputeReasonLabel: "ما هي المشكلة؟",
     disputeEvidenceLabel: "صور (اختياري لكنها تساعد كثيرًا)",
@@ -1207,6 +1209,7 @@ const ordersApi = {
   submitBankConfirmation: (id, referenceText, token) => apiRequest(`/orders/${id}/bank-transfer-confirmation`, { method: "POST", body: JSON.stringify({ referenceText }), headers: { Authorization: `Bearer ${token}` } }),
   requestRefund: (id, amount, reason, token) => apiRequest(`/orders/${id}/refund-request`, { method: "POST", body: JSON.stringify({ amount, reason }), headers: { Authorization: `Bearer ${token}` } }),
   redeemCode: (id, code, token) => apiRequest(`/orders/${id}/redeem-code`, { method: "POST", body: JSON.stringify({ code }), headers: { Authorization: `Bearer ${token}` } }),
+  protectionInvoice: (id, token) => apiRequest(`/orders/${id}/protection-invoice`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
   lookupByCode: (code, token) => apiRequest(`/orders/lookup-by-code/${encodeURIComponent(code)}`, { headers: { Authorization: `Bearer ${token}` } }),
 };
 
@@ -1389,6 +1392,8 @@ function mapApiOrder(o, extras = {}) {
     commissionPct: Number(o.commission_pct),
     commissionAmount: Number(o.commission_amount),
     commissionSettled: o.commission_settled,
+    feePayer: o.fee_payer || "seller",
+    protectionPaid: !!o.protection_paid,
     paymentMethod: o.payment_method,
     paymentCategory: o.payment_category,
     paymentMethodDetail: o.payment_method_detail,
@@ -1463,6 +1468,9 @@ function mapApiListing(l) {
     image: unsplash(CATEGORY_PHOTO[l.category] || "engine"),
   };
 }
+
+const computeFee = (price) => Math.round(Number(price) * 0.05 * 100) / 100;
+const openPaymentUrl = (url) => { try { if (url) window.open(url, "_blank", "noopener") || (window.location.href = url); } catch { /* ignore */ } };
 
 const FEES = {
   boostPrice: 15, boostDays: 7, protectionPct: 0.05, commissionPct: 0.05, deliveryFlat: 50,
@@ -2296,7 +2304,7 @@ function AppInner() {
   }
   async function handleAcceptOffer(requestId, offerId) {
     try {
-      const { order } = await requestsApi.acceptOffer(requestId, offerId, session.token);
+      const { order, protectionInvoice } = await requestsApi.acceptOffer(requestId, offerId, session.token);
       const { request, offers } = await requestsApi.get(requestId, session.token);
       const mapped = mapApiRequest(request, offers);
       setActiveRequest(mapped);
@@ -2308,6 +2316,7 @@ function AppInner() {
       if (order) {
         await refreshOrder(order.id);
         setScreen("orderDetail");
+        if (protectionInvoice && protectionInvoice.status === "pending" && protectionInvoice.paymentUrl) openPaymentUrl(protectionInvoice.paymentUrl);
       }
     } catch (e) {
       flash(e.message);
@@ -2357,7 +2366,7 @@ function AppInner() {
 
   async function handleCreateOrder(listing, form) {
     try {
-      const { order } = await ordersApi.create(
+      const { order, protectionInvoice } = await ordersApi.create(
         {
           listingId: listing.id, paymentMethod: form.paymentMethod, paymentMethodDetail: form.otherPaymentDetail,
           deliveryMethod: form.deliveryMethod, includeProtection: form.includeProtection,
@@ -2369,9 +2378,19 @@ function AppInner() {
       flash(t("orderPlacedToast"));
       await refreshOrder(order.id);
       setScreen("orderDetail");
+      if (protectionInvoice && protectionInvoice.status === "pending" && protectionInvoice.paymentUrl) openPaymentUrl(protectionInvoice.paymentUrl);
     } catch (e) {
       flash(e.message);
     }
+  }
+
+  async function handlePayFee(orderId) {
+    try {
+      const { protectionInvoice } = await ordersApi.protectionInvoice(orderId, session.token);
+      if (protectionInvoice && protectionInvoice.status === "pending" && protectionInvoice.paymentUrl) { flash(t("feePayLinkToast")); openPaymentUrl(protectionInvoice.paymentUrl); }
+      else if (protectionInvoice && protectionInvoice.status === "paid") await refreshOrder(orderId);
+      else flash(t("feeUnavailable"));
+    } catch (e) { flash(e.message); }
   }
 
   // Accepting an order reserves the listing (so nobody else can buy it)
@@ -2665,6 +2684,8 @@ function AppInner() {
               messages={messages.filter((m) => m.orderId === activeOrder.id)}
               onBack={() => setScreen("account")}
               onAccept={() => handleAcceptOrder(activeOrder.id)}
+              onPayFee={() => handlePayFee(activeOrder.id)}
+              onRefreshOrder={() => refreshOrder(activeOrder.id)}
               onPrepare={() => handlePrepareOrder(activeOrder.id)}
               onDispatch={() => handleDispatchOrder(activeOrder.id)}
               onFulfil={() => handleFulfilOrder(activeOrder.id)}
@@ -3383,7 +3404,7 @@ function ListingDetail({ listing, shops, session, onBack, onBuy, onMarkSold, isO
   const { t, lang, dir } = useLang();
   const Icon = CAT_ICON[listing.category] || Package;
   const shop = listing.shopId ? shops.find((s) => s.id === listing.shopId) : null;
-  const protectionAmount = Math.round(listing.price * FEES.protectionPct);
+  const protectionAmount = computeFee(listing.price);
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   const cond = findCondition(listing.condition);
   const city = findCity(listing.city);
@@ -4123,8 +4144,7 @@ function BuyModal({ listing, onClose, onSubmit }) {
   const paymentCategory = paymentMethod === "cash" || paymentMethod === "reserve_at_shop" ? "cash" : "electronic";
   const canSubmit = (paymentMethod !== "other" || otherPaymentDetail.trim().length > 0) && (deliveryMethod !== "delivery" || deliveryAddress.trim().length > 0);
   const deliveryFee = deliveryMethod === "delivery" ? FEES.deliveryFlat : 0;
-  const protectionFee = includeProtection ? Math.round(listing.price * FEES.protectionPct) : 0;
-  const commission = Math.round(listing.price * FEES.commissionPct);
+  const protectionFee = computeFee(listing.price);
   const total = listing.price + deliveryFee + protectionFee;
   const cur = lang === "ar" ? "د.ل" : listing.currency;
 
@@ -4175,12 +4195,6 @@ function BuyModal({ listing, onClose, onSubmit }) {
         </Field>
       )}
 
-      {listing.protectedDeal && (
-        <label className="flex items-center gap-2 mb-4 text-sm p-2.5 rounded-lg" style={{ background: C.greenLight, color: C.asphalt }}>
-          <input type="checkbox" checked={includeProtection} onChange={(e) => setIncludeProtection(e.target.checked)} />
-          <ShieldCheck size={14} color={C.green} /> {t("includeProtectionCheckbox", { fee: Math.round(listing.price * FEES.protectionPct) })}
-        </label>
-      )}
 
       <div className="p-3 rounded-xl mb-3" style={{ background: C.sand }}>
         <div className="flex items-center justify-between text-sm mb-1"><span style={{ color: C.steel }}>{t("partPriceLabel")}</span><span style={{ fontFamily: "'IBM Plex Mono', monospace", color: C.asphalt }}>{listing.price.toLocaleString()} {cur}</span></div>
@@ -4191,7 +4205,7 @@ function BuyModal({ listing, onClose, onSubmit }) {
 
       <p className="text-xs mb-4 flex items-start gap-1.5" style={{ color: C.steel }}>
         <CircleDollarSign size={13} className="mt-0.5 flex-shrink-0" />
-        {t("sellerCommissionNote", { pct: Math.round(FEES.commissionPct * 100) })} ({commission.toLocaleString()} {cur})
+        {t("sellerCommissionNote", { pct: Math.round(FEES.protectionPct * 100) })}
       </p>
 
       <PrimaryButton full disabled={!canSubmit} icon={paymentMethod === "reserve_at_shop" ? Rocket : ShoppingCart} onClick={() => onSubmit({ paymentMethod, paymentCategory, otherPaymentDetail: paymentMethod === "other" ? otherPaymentDetail.trim() : null, deliveryMethod: paymentMethod === "reserve_at_shop" ? "pickup" : deliveryMethod, deliveryAddress: deliveryMethod === "delivery" ? deliveryAddress.trim() : null, deliveryNotes: deliveryMethod === "delivery" ? deliveryNotes.trim() : null, includeProtection })}>{paymentMethod === "reserve_at_shop" ? t("reservePartBtn") : t("placeOrderBtn")}</PrimaryButton>
@@ -4219,7 +4233,7 @@ function OrderCard({ order, session, onOpen }) {
   );
 }
 
-function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, onDispatch, onFulfil, onConfirmReceipt, onDispute, onCancel, onSendMessage, onRequestRefund, onSubmitBankConfirmation, onRedeemCode, onConfirmSourced, onSubmitReview }) {
+function OrderDetail({ order, session, messages, onBack, onAccept, onPayFee, onRefreshOrder, onPrepare, onDispatch, onFulfil, onConfirmReceipt, onDispute, onCancel, onSendMessage, onRequestRefund, onSubmitBankConfirmation, onRedeemCode, onConfirmSourced, onSubmitReview }) {
   const { t, lang, dir } = useLang();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   const isBuyer = session?.id === order.buyerId;
@@ -4281,7 +4295,19 @@ function OrderDetail({ order, session, messages, onBack, onAccept, onPrepare, on
           <div className="flex items-center justify-between text-sm pt-2 mt-1 border-t font-bold" style={{ borderColor: C.line }}><span>{t("totalToPay")}</span><span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{total.toLocaleString()} {cur}</span></div>
         </div>
 
-        {isSeller && (
+        {isBuyer && order.feePayer === "buyer" && order.protectionFee > 0 && !["cancelled", "refunded"].includes(order.status) && (
+          order.protectionPaid ? (
+            <p className="mt-2 text-xs font-semibold flex items-center gap-1.5 p-2.5 rounded-lg" style={{ background: C.greenLight, color: C.green }}><ShieldCheck size={13} />{t("feePaidLabel")}</p>
+          ) : (
+            <div className="mt-2 p-3 rounded-xl border" style={{ borderColor: C.amber, background: C.amberLight }}>
+              <p className="text-xs mb-2" style={{ color: C.amberDark }}>{t("payFeeNote")}</p>
+              <PrimaryButton full icon={ShieldCheck} onClick={onPayFee}>{t("payFeeBtn")} · {order.protectionFee.toLocaleString()} {cur}</PrimaryButton>
+              <GhostButton full onClick={onRefreshOrder} style={{ marginTop: 8 }}>{t("refreshFeeBtn")}</GhostButton>
+            </div>
+          )
+        )}
+
+        {isSeller && order.feePayer !== "buyer" && (
           <div className="mt-2 p-3 rounded-xl" style={{ background: C.amberLight }}>
             <p className="text-xs font-semibold mb-2 flex items-center gap-1" style={{ color: C.amberDark }}><CircleDollarSign size={12} />{t("yourEarningsLabel")}</p>
             <div className="flex items-center justify-between text-xs mb-1"><span style={{ color: C.amberDark }}>{t("saleAmountLabel")}</span><span style={{ fontFamily: "'IBM Plex Mono', monospace", color: C.amberDark }}>{order.partPrice.toLocaleString()} {cur}</span></div>
@@ -4609,7 +4635,7 @@ function SellerCenterScreen({ session, myShop, myListings, mySales, matchingRequ
   const totalSaves = myListings.reduce((sum, l) => sum + (l.saves || 0), 0);
   const completedSales = mySales.filter((o) => o.status === "completed");
   const revenue = completedSales.reduce((sum, o) => sum + o.partPrice, 0);
-  const commissionOwed = completedSales.reduce((sum, o) => sum + o.commissionAmount, 0);
+  const commissionOwed = completedSales.filter((o) => o.feePayer !== "buyer").reduce((sum, o) => sum + o.commissionAmount, 0);
   const cur = lang === "ar" ? "د.ل" : "LYD";
 
   const statusTabs = ["all", "active", "reserved", "sold", "draft", "removed"];
@@ -4708,8 +4734,8 @@ function SellerCenterScreen({ session, myShop, myListings, mySales, matchingRequ
       {tab === "financials" && (
         <div className="p-4">
           {(() => {
-            const settledSales = completedSales.filter((o) => o.commissionSettled);
-            const outstandingSales = completedSales.filter((o) => !o.commissionSettled);
+            const settledSales = completedSales.filter((o) => o.feePayer !== "buyer" && o.commissionSettled);
+            const outstandingSales = completedSales.filter((o) => o.feePayer !== "buyer" && !o.commissionSettled);
             const settledAmount = settledSales.reduce((sum, o) => sum + o.commissionAmount, 0);
             const outstandingAmount = outstandingSales.reduce((sum, o) => sum + o.commissionAmount, 0);
             const refundedSales = mySales.filter((o) => o.refund?.status === "refunded");
